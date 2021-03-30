@@ -1,10 +1,9 @@
 import os
 import numpy as np
-import torch
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset
 import random
 import sys
-import time
+
 
 
 def get_dataset(config):
@@ -35,29 +34,23 @@ class BasicDataset(Dataset):
         while not_stop:
             not_stop = False
             for user in user_inter_set:
-                if 0 < len(user_inter_set[user]) < self.min_interactions:
+                if len(user_inter_set[user]) < self.min_interactions:
                     not_stop = True
                     for item in user_inter_set[user]:
                         item_inter_set[item].remove(user)
-                    user_inter_set[user] = {}
+                    user_inter_set.pop(user)
             for item in item_inter_set:
-                if 0 < len(item_inter_set[item]) < self.min_interactions:
+                if len(item_inter_set[item]) < self.min_interactions:
                     not_stop = True
                     for user in item_inter_set[item]:
                         user_inter_set[user].remove(item)
-                    item_inter_set[item] = {}
+                    item_inter_set.pop(item)
         user_map = dict()
-        idx = 0
-        for user in user_inter_set:
-            if len(user_inter_set[user]) > 0:
-                user_map[user] = idx
-                idx += 1
+        for idx, user in enumerate(user_inter_set):
+            user_map[user] = idx
         item_map = dict()
-        idx = 0
-        for item in item_inter_set:
-            if len(item_inter_set[item]) > 0:
-                item_map[item] = idx
-                idx += 1
+        for idx, item in enumerate(item_inter_set):
+            item_map[item] = idx
         self.n_users = len(user_map)
         self.n_items = len(item_map)
         return user_map, item_map
@@ -73,10 +66,9 @@ class BasicDataset(Dataset):
             average_inters.append(n_inter_items)
             n_train_items = int(n_inter_items * self.split_ratio[0])
             n_test_items = int(n_inter_items * self.split_ratio[2])
-            user_inter_lists[user].sort(key=lambda entry: entry[1])
-            self.train_data[user] += [i_t[0] for i_t in user_inter_lists[user][:n_train_items]]
-            self.val_data[user] += [i_t[0] for i_t in user_inter_lists[user][n_train_items:-n_test_items]]
-            self.test_data[user] += [i_t[0] for i_t in user_inter_lists[user][-n_test_items:]]
+            self.train_data[user] += [item for item in user_inter_lists[user][:n_train_items]]
+            self.val_data[user] += [item for item in user_inter_lists[user][n_train_items:-n_test_items]]
+            self.test_data[user] += [item for item in user_inter_lists[user][-n_test_items:]]
             self.train_array.extend([[user, item] for item in self.train_data[user]])
         average_inters = np.mean(average_inters)
         print('Users {:d}, Items {:d}, Average number of interactions {:.3f}'
@@ -136,6 +128,9 @@ class ML1MDataset(BasicDataset):
                         break
                 if not duplicate:
                     user_inter_lists[user_map[u]].append([item_map[i], t])
+        for user in range(self.n_users):
+            user_inter_lists[user].sort(key=lambda entry: entry[1])
+            user_inter_lists[user] = [i_t[0] for i_t in user_inter_lists[user]]
         self.generate_data(user_inter_lists)
 
 

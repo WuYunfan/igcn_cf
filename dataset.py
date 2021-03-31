@@ -39,12 +39,14 @@ class BasicDataset(Dataset):
                     for item in user_inter_set[user]:
                         item_inter_set[item].remove(user)
                     user_inter_set.pop(user)
+                    break
             for item in item_inter_set:
                 if len(item_inter_set[item]) < self.min_interactions:
                     not_stop = True
                     for user in item_inter_set[item]:
                         user_inter_set[user].remove(item)
                     item_inter_set.pop(item)
+                    break
         user_map = dict()
         for idx, user in enumerate(user_inter_set):
             user_map[user] = idx

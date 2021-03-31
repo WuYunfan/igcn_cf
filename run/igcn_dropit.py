@@ -12,7 +12,7 @@ def main():
 
     device = torch.device('cuda')
     dataset_config = {'name': 'LGCNDataset', 'path': 'data/LGCN/gowalla_it_0_8',
-                      'device': device, 'neg_ratio': 1, 'val_ratio': 0.1}
+                      'device': device, 'val_ratio': 0.1}
     model_config = {'name': 'IGCN', 'embedding_size': 64, 'n_layers': 3, 'device': device,
                     'dropout': 0.5, 'feature_ratio': 1.}
     trainer_config = {'name': 'BPRTrainer', 'optimizer': 'Adam', 'lr': 1.e-3, 'l2_reg': 1.e-5,

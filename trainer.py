@@ -179,7 +179,7 @@ class BPRTrainer(BasicTrainer):
     def train_one_epoch(self):
         losses = AverageMeter()
         for batch_data in self.dataloader:
-            inputs = batch_data.reshape(-1, 3).to(device=self.device, dtype=torch.int64)
+            inputs = batch_data[:, 0, :].to(device=self.device, dtype=torch.int64)
             users, pos_items, neg_items = inputs[:, 0],  inputs[:, 1],  inputs[:, 2]
 
             users_r, pos_items_r, neg_items_r, l2_norm_sq = self.model.bpr_forward(users, pos_items, neg_items)
@@ -201,7 +201,7 @@ class BCETrainer(BasicTrainer):
         super(BCETrainer, self).__init__(trainer_config)
 
         self.dataloader = DataLoader(self.dataset, batch_size=trainer_config['batch_size'],
-                                     num_workers=trainer_config['dataloader_num_workers'])
+                                     num_workers=trainer_config['dataloader_num_workers'], shuffle=True)
         self.opt = getattr(sys.modules[__name__], trainer_config['optimizer'])
         self.opt = self.opt(self.model.parameters(), lr=trainer_config['lr'])
         self.l2_reg = trainer_config['l2_reg']

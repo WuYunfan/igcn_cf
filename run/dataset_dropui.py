@@ -40,7 +40,7 @@ def resize_dataset(dataset, ratio):
 def main():
     device = torch.device('cuda')
     dataset_config = {'name': 'LGCNDataset', 'path': 'data/LGCN/gowalla',
-                      'device': device, 'neg_ratio': 1, 'val_ratio': 0.}
+                      'device': device, 'val_ratio': 0.}
     dataset = get_dataset(dataset_config)
     resize_dataset(dataset, 0.8)
     output_dataset(dataset, 'data/LGCN/gowalla_ui_0_8')

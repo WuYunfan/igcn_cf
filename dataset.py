@@ -20,7 +20,7 @@ class BasicDataset(Dataset):
         self.min_interactions = dataset_config.get('min_inter')
         self.split_ratio = dataset_config.get('split_ratio')
         self.device = dataset_config['device']
-        self.negative_sample_ratio = dataset_config['neg_ratio']
+        self.negative_sample_ratio = dataset_config.get('neg_ratio', 0)
         self.n_users = 0
         self.n_items = 0
         self.train_data = None
@@ -80,12 +80,16 @@ class BasicDataset(Dataset):
         return len(self.train_array)
 
     def __getitem__(self, index):
-        user = random.randint(0, self.n_users - 1)
-        while not self.train_data[user]:
+        negative_sample_ratio = max(self.negative_sample_ratio, 1)
+        if not self.negative_sample_ratio:
             user = random.randint(0, self.n_users - 1)
-        pos_item = np.random.choice(self.train_data[user])
-        data_with_negs = [[user, pos_item] for _ in range(self.negative_sample_ratio)]
-        for idx in range(self.negative_sample_ratio):
+            while not self.train_data[user]:
+                user = random.randint(0, self.n_users - 1)
+            pos_item = np.random.choice(self.train_data[user])
+        else:
+            user, pos_item = self.train_array[index]
+        data_with_negs = [[user, pos_item] for _ in range(negative_sample_ratio)]
+        for idx in range(negative_sample_ratio):
             neg_item = random.randint(0, self.n_items - 1)
             while neg_item in self.train_data[user]:
                 neg_item = random.randint(0, self.n_items - 1)

@@ -11,7 +11,7 @@ def fitness(lr, l2_reg):
     set_seed(2021)
     device = torch.device('cuda')
     dataset_config = {'name': 'LGCNDataset', 'path': 'data/LGCN/gowalla',
-                      'device': device, 'neg_ratio': 1, 'val_ratio': 0.1}
+                      'device': device, 'val_ratio': 0.1}
     model_config = {'name': 'LightGCN', 'embedding_size': 64, 'n_layers': 3, 'device': device}
     trainer_config = {'name': 'BPRTrainer', 'optimizer': 'Adam', 'lr': lr, 'l2_reg': l2_reg,
                       'device': device, 'n_epochs': 1000, 'batch_size': 2048, 'dataloader_num_workers': 6,

@@ -91,7 +91,7 @@ class BasicTrainer:
                 print('Best NDCG, save model to {:s}'.format(self.save_path))
             else:
                 patience -= self.val_interval
-                if patience == 0:
+                if patience <= 0:
                     print('Early stopping!')
                     break
         self.model.load(self.save_path)
@@ -201,7 +201,7 @@ class BCETrainer(BasicTrainer):
         super(BCETrainer, self).__init__(trainer_config)
 
         self.dataloader = DataLoader(self.dataset, batch_size=trainer_config['batch_size'],
-                                     num_workers=trainer_config['dataloader_num_workers'], shuffle=True)
+                                     num_workers=trainer_config['dataloader_num_workers'])
         self.opt = getattr(sys.modules[__name__], trainer_config['optimizer'])
         self.opt = self.opt(self.model.parameters(), lr=trainer_config['lr'])
         self.l2_reg = trainer_config['l2_reg']

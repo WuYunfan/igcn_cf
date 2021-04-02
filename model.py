@@ -225,6 +225,21 @@ class ItemKNN(BasicModel):
         return scores
 
 
+class Popularity(BasicModel):
+    def __init__(self, model_config):
+        super(Popularity, self).__init__(model_config)
+        self.item_degree = self.calculate_degree(model_config['dataset'])
+
+    def calculate_degree(self, dataset):
+        data_mat = sp.coo_matrix((np.ones((len(dataset.train_array),)), np.array(dataset.train_array).T),
+                                 shape=(self.n_users, self.n_items), dtype=np.float32).tocsr()
+        item_degree = np.array(np.sum(data_mat, axis=0)).squeeze()
+        return torch.tensor(item_degree, dtype=torch.float32, device=self.device)
+
+    def predict(self, users):
+        return self.item_degree[None, :].repeat(users.shape[0], 1)
+
+
 class IGCN(BasicModel):
     def __init__(self, model_config):
         super(IGCN, self).__init__(model_config)
@@ -232,14 +247,15 @@ class IGCN(BasicModel):
         self.n_layers = model_config['n_layers']
         self.dropout = model_config['dropout']
         self.feature_ratio = model_config['feature_ratio']
-        self.norm_adj, self.feat_mat, self.user_map, self.item_map = self.generate_graph(model_config['dataset'])
+        self.norm_adj = self.generate_graph(model_config['dataset'])
+        self.feat_mat, self.user_map, self.item_map = self.generate_feat(model_config['dataset'])
 
         self.dense_layer = nn.Linear(self.feat_mat.shape[1], self.embedding_size)
         normal_(self.dense_layer.weight, std=0.1)
         zeros_(self.dense_layer.bias)
         self.to(device=self.device)
 
-    def generate_graph(self, dataset, is_updating=False):
+    def generate_graph(self, dataset):
         sub_mat = sp.coo_matrix((np.ones((len(dataset.train_array),)), np.array(dataset.train_array).T),
                                 shape=(self.n_users, self.n_items), dtype=np.float32)
         adj_mat = sp.lil_matrix((self.n_users + self.n_items, self.n_users + self.n_items), dtype=np.float32)
@@ -254,7 +270,11 @@ class IGCN(BasicModel):
 
         norm_adj = d_mat.dot(adj_mat).dot(d_mat)
         norm_adj = get_sparse_tensor(norm_adj, self.device)
+        return norm_adj
 
+    def generate_feat(self, dataset, is_updating=False):
+        sub_mat = sp.coo_matrix((np.ones((len(dataset.train_array),)), np.array(dataset.train_array).T),
+                                shape=(self.n_users, self.n_items), dtype=np.float32)
         if not is_updating:
             user_degree = np.array(np.sum(sub_mat, axis=1)).squeeze()
             popular_users = np.argsort(user_degree)[-int(self.n_users * self.feature_ratio):]
@@ -287,12 +307,11 @@ class IGCN(BasicModel):
         feat = sp.coo_matrix((np.ones((len(indices),)), np.array(indices).T),
                              shape=(self.n_users + self.n_items, user_dim + item_dim + 2), dtype=np.float32)
         degree = np.array(np.sum(feat, axis=1)).squeeze()
-        degree = np.maximum(1., degree)
         d_inv = np.power(degree, -1.)
         d_mat = sp.diags(d_inv, format='csr', dtype=np.float32)
         feat = d_mat.dot(feat)
         feat = get_sparse_tensor(feat, self.device)
-        return norm_adj, feat, user_map, item_map
+        return feat, user_map, item_map
 
     def get_rep(self):
         feat_mat = NGCF.dropout_sp_mat(self, self.feat_mat)

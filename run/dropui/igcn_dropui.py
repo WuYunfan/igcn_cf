@@ -4,6 +4,7 @@ from trainer import get_trainer
 import torch
 from utils import init_run, set_seed
 from tensorboardX import SummaryWriter
+from torch.nn.init import normal_, zeros_
 
 
 def main():
@@ -30,9 +31,9 @@ def main():
     dataset_config = {'name': 'LGCNDataset', 'path': 'data/LGCN/gowalla',
                       'device': device, 'neg_ratio': 1, 'val_ratio': 0.1}
     new_dataset = get_dataset(dataset_config)
-    model.n_users = new_dataset.n_users
-    model.n_items = new_dataset.n_items
-    model.norm_adj, model.feat_mat, _, _ = model.generate_graph(new_dataset, is_updating=True)
+    model.n_users, model.n_items = new_dataset.n_users, new_dataset.n_items
+    model.norm_adj = model.generate_graph(new_dataset)
+    model.feat_mat, _, _ = model.generate_feat(new_dataset, is_updating=True)
     trainer = get_trainer(trainer_config, new_dataset, model)
 
     default_model = get_model(model_config, new_dataset)
@@ -58,6 +59,25 @@ def main():
     print('New user test result. {:s}'.format(results))
     results, _ = default_trainer.eval('test')
     print('Default model new user test result. {:s}'.format(results))
+
+    writer = SummaryWriter(log_path)
+    normal_(model.dense_layer.weight, std=0.1)
+    zeros_(model.dense_layer.bias)
+    trainer.train(verbose=True, writer=writer)
+    writer.close()
+    print('Default model with partial features')
+    new_dataset.test_data = test_data.copy()
+    results, _ = trainer.eval('test')
+    print('All user test result. {:s}'.format(results))
+    for user in range(dataset.n_users, new_dataset.n_users):
+        new_dataset.test_data[user] = []
+    results, _ = trainer.eval('test')
+    print('Old user test result. {:s}'.format(results))
+    new_dataset.test_data = test_data.copy()
+    for user in range(dataset.n_users):
+        new_dataset.test_data[user] = []
+    results, _ = trainer.eval('test')
+    print('New user test result. {:s}'.format(results))
 
 
 if __name__ == '__main__':

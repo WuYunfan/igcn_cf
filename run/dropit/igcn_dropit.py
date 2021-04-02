@@ -33,7 +33,8 @@ def main():
     results, _ = trainer.eval('test')
     print('Previous interactions test result. {:s}'.format(results))
 
-    model.norm_adj, model.feat_mat, _, _ = model.generate_graph(new_dataset, is_updating=True)
+    model.norm_adj = model.generate_graph(new_dataset)
+    model.feat_mat, _, _ = model.generate_feat(new_dataset, is_updating=True)
     results, _ = trainer.eval('test')
     print('Updated interactions test result. {:s}'.format(results))
 

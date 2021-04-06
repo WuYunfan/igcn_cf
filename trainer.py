@@ -45,7 +45,7 @@ class BasicTrainer:
                                   , metrics[metric][k], epoch)
 
     def train(self, verbose=True, writer=None):
-        if self.model.name == 'ItemKNN':
+        if not self.model.trainable:
             results, metrics = self.eval('val')
             if verbose:
                 print('Validation result. {:s}'.format(results))

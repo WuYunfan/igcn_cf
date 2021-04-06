@@ -3,7 +3,7 @@ import torch.nn as nn
 import scipy.sparse as sp
 import numpy as np
 from utils import get_sparse_tensor
-from torch.nn.init import kaiming_uniform_, calculate_gain, normal_, zeros_
+from torch.nn.init import kaiming_uniform_, calculate_gain, normal_, zeros_, ones_
 import sys
 import torch.nn.functional as F
 
@@ -341,7 +341,8 @@ class IGCN(BasicModel):
         self.load_state_dict(params['sate_dict'])
         self.user_map = params['user_map']
         self.item_map = params['item_map']
-        self.norm_adj, self.feat_mat, _, _ = self.generate_graph(self.config['dataset'], is_updating=True)
+        self.norm_adj = self.generate_graph(self.config['dataset'])
+        self.feat_mat, _, _ = self.generate_feat(self.config['dataset'], is_updating=True)
 
 
 class NeuMF(BasicModel):
@@ -366,7 +367,9 @@ class NeuMF(BasicModel):
         normal_(self.mlp_item_embedding.weight, std=0.1)
         for layer in self.mlp_layers:
             kaiming_uniform_(layer.weight, nonlinearity='relu')
-        kaiming_uniform_(self.output_layer.weight, nonlinearity='sigmoid')
+            zeros_(layer.bias)
+        ones_(self.output_layer.weight)
+        zeros_(self.output_layer.bias)
         self.to(device=self.device)
 
     def bce_forward(self, users, items):

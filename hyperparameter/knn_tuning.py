@@ -7,15 +7,14 @@ from model import get_model
 from trainer import get_trainer
 
 
-def fitness(lr, l2_reg):
+def fitness(k):
     set_seed(2021)
     device = torch.device('cuda')
     dataset_config = {'name': 'LGCNDataset', 'path': 'data/LGCN/gowalla',
-                      'device': device, 'neg_ratio': 4, 'val_ratio': 0.1}
-    model_config = {'name': 'NeuMF', 'embedding_size': 64, 'device': device, 'layer_sizes': [64, 64, 64]}
-    trainer_config = {'name': 'BCETrainer', 'optimizer': 'Adam', 'lr': lr, 'l2_reg': l2_reg,
-                      'device': device, 'n_epochs': 1000, 'batch_size': 2048, 'dataloader_num_workers': 6,
-                      'test_batch_size': 64, 'topks': [20]}
+                      'device': device, 'val_ratio': 0.1}
+    model_config = {'name': 'ItemKNN', 'k': k, 'device': device}
+    trainer_config = {'name': 'BasicTrainer',  'device': device, 'n_epochs': 0,
+                      'test_batch_size': 512, 'topks': [20]}
     dataset = get_dataset(dataset_config)
     model = get_model(model_config, dataset)
     trainer = get_trainer(trainer_config, dataset, model)
@@ -25,12 +24,12 @@ def fitness(lr, l2_reg):
 def main():
     log_path = __file__[:-3]
     init_run(log_path, 2021)
-    param_grid = {'lr': [1.e-3, 1.e-2], 'l2_reg': [1.e-5, 1.e-4, 1.e-3, 1.e-2]}
+    param_grid = {'k': [10, 50, 200, 1000]}
     grid = ParameterGrid(param_grid)
     max_ndcg = -np.inf
     best_params = None
     for params in grid:
-        ndcg = fitness(params['lr'], params['l2_reg'])
+        ndcg = fitness(params['k'])
         print('NDCG: {:.3f}, Parameters: {:s}'.format(ndcg, str(params)))
         if ndcg > max_ndcg:
             max_ndcg = ndcg

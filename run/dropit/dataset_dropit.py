@@ -12,6 +12,7 @@ def dropit_dataset(dataset, ratio):
 
 
 def main():
+    set_seed(2021)
     device = torch.device('cuda')
     dataset_config = {'name': 'LGCNDataset', 'path': 'data/LGCN/gowalla',
                       'device': device, 'val_ratio': 0.}

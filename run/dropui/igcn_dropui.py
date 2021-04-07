@@ -5,6 +5,7 @@ import torch
 from utils import init_run, set_seed
 from tensorboardX import SummaryWriter
 from torch.nn.init import normal_, zeros_
+from config import get_gowalla_config, get_yelp_config, get_ml1m_config
 
 
 def main():
@@ -12,13 +13,9 @@ def main():
     init_run(log_path, 2021)
 
     device = torch.device('cuda')
-    dataset_config = {'name': 'LGCNDataset', 'path': 'data/LGCN/gowalla_ui_0_8',
-                      'device': device, 'val_ratio': 0.1}
-    model_config = {'name': 'IGCN', 'embedding_size': 64, 'n_layers': 3, 'device': device,
-                    'dropout': 0.5, 'feature_ratio': 1.}
-    trainer_config = {'name': 'BPRTrainer', 'optimizer': 'Adam', 'lr': 1.e-3, 'l2_reg': 1.e-5,
-                      'device': device, 'n_epochs': 1000, 'batch_size': 2048, 'dataloader_num_workers': 6,
-                      'test_batch_size': 512, 'topks': [20]}
+    config = get_gowalla_config(device)
+    dataset_config, model_config, trainer_config = config[2]
+    dataset_config['path'] = 'data/LGCN/gowalla_ui_0_8'
 
     writer = SummaryWriter(log_path)
     dataset = get_dataset(dataset_config)
@@ -28,9 +25,9 @@ def main():
     writer.close()
 
     set_seed(2021)
-    dataset_config = {'name': 'LGCNDataset', 'path': 'data/LGCN/gowalla',
-                      'device': device, 'neg_ratio': 1, 'val_ratio': 0.1}
+    dataset_config['path'] = 'data/LGCN/gowalla'
     new_dataset = get_dataset(dataset_config)
+    model.config['dataset'] = new_dataset
     model.n_users, model.n_items = new_dataset.n_users, new_dataset.n_items
     model.norm_adj = model.generate_graph(new_dataset)
     model.feat_mat, _, _ = model.generate_feat(new_dataset, is_updating=True)

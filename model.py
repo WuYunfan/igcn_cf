@@ -9,6 +9,7 @@ import torch.nn.functional as F
 
 
 def get_model(config, dataset):
+    config = config.copy()
     config['dataset'] = dataset
     model = getattr(sys.modules['model'], config['name'])
     model = model(config)
@@ -368,25 +369,37 @@ class NeuMF(BasicModel):
         normal_(self.mf_item_embedding.weight, std=0.1)
         normal_(self.mlp_user_embedding.weight, std=0.1)
         normal_(self.mlp_item_embedding.weight, std=0.1)
+        self.init_mlp_layers()
+        self.arch = 'gmf'
+        self.to(device=self.device)
+
+    def init_mlp_layers(self):
         for layer in self.mlp_layers:
             kaiming_uniform_(layer.weight, nonlinearity='leaky_relu')
             zeros_(layer.bias)
         ones_(self.output_layer.weight)
-        self.to(device=self.device)
 
     def bce_forward(self, users, items):
         users_mf_e, items_mf_e = self.mf_user_embedding(users), self.mf_item_embedding(items)
         users_mlp_e, items_mlp_e = self.mlp_user_embedding(users), self.mlp_item_embedding(items)
+        l2_norm_sq = torch.norm(users_mf_e, p=2, dim=1) ** 2 + torch.norm(items_mf_e, p=2, dim=1) ** 2 \
+                     + torch.norm(users_mlp_e, p=2, dim=1) ** 2 + torch.norm(items_mlp_e, p=2, dim=1) ** 2
 
         mf_vectors = users_mf_e * items_mf_e
         mlp_vectors = torch.cat([users_mlp_e, items_mlp_e], dim=1)
-        l2_norm_sq = torch.norm(self.output_layer.weight, p=2)[None] ** 2
         for layer in self.mlp_layers:
             mlp_vectors = F.leaky_relu(layer(mlp_vectors))
-            l2_norm_sq += torch.norm(layer.weight, p=2)[None] ** 2
+            # l2_norm_sq += torch.norm(layer.weight, p=2)[None] ** 2
 
-        predict_vectors = torch.cat([mf_vectors, mlp_vectors], dim=1)
+        if self.arch == 'gmf':
+            vectors = [mf_vectors, torch.zeros_like(mlp_vectors, device=self.device, dtype=torch.float32)]
+        elif self.arch == 'mlp':
+            vectors = [torch.zeros_like(mf_vectors, device=self.device, dtype=torch.float32), mlp_vectors]
+        else:
+            vectors = [mf_vectors, mlp_vectors]
+        predict_vectors = torch.cat(vectors, dim=1)
         scores = self.output_layer(predict_vectors).squeeze()
+        # l2_norm_sq += torch.norm(self.output_layer.weight, p=2)[None] ** 2
         return scores, l2_norm_sq
 
     def predict(self, users):

@@ -5,8 +5,8 @@ import random
 import sys
 
 
-
 def get_dataset(config):
+    config = config.copy()
     dataset = getattr(sys.modules['dataset'], config['name'])
     dataset = dataset(config)
     return dataset

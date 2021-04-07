@@ -10,6 +10,7 @@ import torch.nn.functional as F
 
 
 def get_trainer(config, dataset, model):
+    config = config.copy()
     config['dataset'] = dataset
     config['model'] = model
     trainer = getattr(sys.modules['trainer'], config['name'])
@@ -29,6 +30,8 @@ class BasicTrainer:
         self.n_epochs = trainer_config['n_epochs']
         self.max_patience = trainer_config.get('max_patience', 50)
         self.val_interval = trainer_config.get('val_interval', 1)
+        self.epoch = 0
+        self.best_ndcg = -np.inf
         self.save_path = None
 
         test_user = TensorDataset(torch.arange(self.dataset.n_users, dtype=torch.int64, device=self.device))
@@ -37,12 +40,12 @@ class BasicTrainer:
     def train_one_epoch(self):
         raise NotImplementedError
 
-    def record(self, writer, stage, metrics, epoch):
+    def record(self, writer, stage, metrics):
         for metric in metrics:
             for k in self.topks:
                 writer.add_scalar('{:s}_{:s}/{:s}_{:s}@{:d}'
                                   .format(self.model.name, self.name, stage, metric, k)
-                                  , metrics[metric][k], epoch)
+                                  , metrics[metric][k], self.epoch)
 
     def train(self, verbose=True, writer=None):
         if not self.model.trainable:
@@ -53,9 +56,8 @@ class BasicTrainer:
             return ndcg
 
         if not os.path.exists('checkpoints'): os.mkdir('checkpoints')
-        best_ndcg = -np.inf
         patience = self.max_patience
-        for epoch in range(self.n_epochs):
+        for self.epoch in range(self.n_epochs):
             start_time = time.time()
             self.model.train()
             loss = self.train_one_epoch()
@@ -63,12 +65,12 @@ class BasicTrainer:
             consumed_time = time.time() - start_time
             if verbose:
                 print('Epoch {:d}/{:d}, Loss: {:.6f}, Time: {:.3f}s'
-                      .format(epoch, self.n_epochs, loss, consumed_time))
+                      .format(self.epoch, self.n_epochs, loss, consumed_time))
             if writer:
-                writer.add_scalar('{:s}_{:s}/train_loss'.format(self.model.name, self.name), loss, epoch)
-                self.record(writer, 'train', metrics, epoch)
+                writer.add_scalar('{:s}_{:s}/train_loss'.format(self.model.name, self.name), loss, self.epoch)
+                self.record(writer, 'train', metrics)
 
-            if (epoch + 1) % self.val_interval != 0:
+            if (self.epoch + 1) % self.val_interval != 0:
                 continue
 
             start_time = time.time()
@@ -77,15 +79,15 @@ class BasicTrainer:
             if verbose:
                 print('Validation result. {:s}Time: {:.3f}s'.format(results, consumed_time))
             if writer:
-                self.record(writer, 'validation', metrics, epoch)
+                self.record(writer, 'validation', metrics)
 
             ndcg = metrics['NDCG'][self.topks[0]]
-            if ndcg > best_ndcg:
+            if ndcg > self.best_ndcg:
                 if self.save_path:
                     os.remove(self.save_path)
                 self.save_path = os.path.join('checkpoints', '{:s}_{:s}_{:s}_{:.3f}.pth'
                                               .format(self.model.name, self.name, self.dataset.name, ndcg * 100))
-                best_ndcg = ndcg
+                self.best_ndcg = ndcg
                 self.model.save(self.save_path)
                 patience = self.max_patience
                 print('Best NDCG, save model to {:s}'.format(self.save_path))
@@ -95,7 +97,7 @@ class BasicTrainer:
                     print('Early stopping!')
                     break
         self.model.load(self.save_path)
-        return best_ndcg
+        return self.best_ndcg
 
     def calculate_metrics(self, eval_data, rec_items):
         results = {'Precision': {}, 'Recall': {}, 'NDCG': {}}
@@ -205,8 +207,21 @@ class BCETrainer(BasicTrainer):
         self.opt = getattr(sys.modules[__name__], trainer_config['optimizer'])
         self.opt = self.opt(self.model.parameters(), lr=trainer_config['lr'])
         self.l2_reg = trainer_config['l2_reg']
+        self.mf_pretrain_epochs = trainer_config['mf_pretrain_epochs']
+        self.mlp_pretrain_epochs = trainer_config['mlp_pretrain_epochs']
 
     def train_one_epoch(self):
+        if self.epoch == self.mf_pretrain_epochs:
+            self.model.arch = 'mlp'
+            self.best_ndcg = -np.inf
+            self.model.load(self.save_path)
+        if self.epoch == self.mf_pretrain_epochs + self.mlp_pretrain_epochs:
+            self.model.arch = 'neumf'
+            self.opt = getattr(sys.modules[__name__], self.config['optimizer'])
+            self.opt = self.opt(self.model.parameters(), lr=self.config['lr'] / 100.)
+            self.best_ndcg = -np.inf
+            self.model.load(self.save_path)
+            self.model.init_mlp_layers()
         losses = AverageMeter()
         for batch_data in self.dataloader:
             inputs = batch_data.to(device=self.device, dtype=torch.int64)

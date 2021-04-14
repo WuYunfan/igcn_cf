@@ -15,7 +15,8 @@ def fitness(lr, l2_reg):
     model_config = {'name': 'NeuMF', 'embedding_size': 64, 'device': device, 'layer_sizes': [64, 64, 64]}
     trainer_config = {'name': 'BCETrainer', 'optimizer': 'Adam', 'lr': lr, 'l2_reg': l2_reg,
                       'device': device, 'n_epochs': 1000, 'batch_size': 2048, 'dataloader_num_workers': 6,
-                      'test_batch_size': 64, 'topks': [20], 'mf_pretrain_epochs': 50, 'mlp_pretrain_epochs': 50}
+                      'test_batch_size': 64, 'topks': [20], 'mf_pretrain_epochs': 100,
+                      'mlp_pretrain_epochs': 100, 'max_patience': 100}
     dataset = get_dataset(dataset_config)
     model = get_model(model_config, dataset)
     trainer = get_trainer(trainer_config, dataset, model)

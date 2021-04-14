@@ -218,7 +218,7 @@ class BCETrainer(BasicTrainer):
         if self.epoch == self.mf_pretrain_epochs + self.mlp_pretrain_epochs:
             self.model.arch = 'neumf'
             self.opt = getattr(sys.modules[__name__], self.config['optimizer'])
-            self.opt = self.opt(self.model.parameters(), lr=self.config['lr'] / 100.)
+            self.opt = self.opt(self.model.parameters(), lr=self.config['lr'])
             self.best_ndcg = -np.inf
             self.model.load(self.save_path)
             self.model.init_mlp_layers()

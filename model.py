@@ -399,7 +399,7 @@ class NeuMF(BasicModel):
             vectors = [mf_vectors, mlp_vectors]
         predict_vectors = torch.cat(vectors, dim=1)
         scores = self.output_layer(predict_vectors).squeeze()
-        # l2_norm_sq += torch.norm(self.output_layer.weight, p=2)[None] ** 2
+        l2_norm_sq += torch.norm(self.output_layer.weight, p=2)[None] ** 2
         return scores, l2_norm_sq
 
     def predict(self, users):

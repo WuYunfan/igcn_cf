@@ -488,7 +488,7 @@ class NeuMF(BasicModel):
         mlp_vectors = torch.cat([users_mlp_e, items_mlp_e], dim=1)
         for layer in self.mlp_layers:
             mlp_vectors = F.leaky_relu(layer(mlp_vectors))
-            # l2_norm_sq += torch.norm(layer.weight, p=2)[None] ** 2
+            l2_norm_sq += torch.norm(layer.weight, p=2)[None] ** 2
 
         if self.arch == 'gmf':
             vectors = [mf_vectors, torch.zeros_like(mlp_vectors, device=self.device, dtype=torch.float32)]

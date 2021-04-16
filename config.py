@@ -27,6 +27,13 @@ def get_gowalla_config(device):
                       'topks': [20, 100], 'device': device}
     gowalla_config.append((dataset_config, model_config, trainer_config))
 
+    model_config = {'name': 'NGCF', 'embedding_size': 64, 'layer_sizes': [64, 64, 64],
+                    'device': device, 'dropout': 0.1}
+    trainer_config = {'name': 'BPRTrainer', 'optimizer': 'Adam', 'lr': 1.e-3, 'l2_reg': 1.e-3,
+                      'device': device, 'n_epochs': 1000, 'batch_size': 2048, 'dataloader_num_workers': 6,
+                      'test_batch_size': 512, 'topks': [20]}
+    gowalla_config.append((dataset_config, model_config, trainer_config))
+
     dataset_config = dataset_config.copy()
     dataset_config['neg_ratio'] = 4
     model_config = {'name': 'NeuMF', 'embedding_size': 64, 'device': device, 'layer_sizes': [64, 64, 64]}
@@ -66,6 +73,13 @@ def get_yelp_config(device):
                       'topks': [20, 100], 'device': device}
     yelp_config.append((dataset_config, model_config, trainer_config))
 
+    model_config = {'name': 'NGCF', 'embedding_size': 64, 'layer_sizes': [64, 64, 64],
+                    'device': device, 'dropout': 0.3}
+    trainer_config = {'name': 'BPRTrainer', 'optimizer': 'Adam', 'lr': 1.e-3, 'l2_reg': 1.e-3,
+                      'device': device, 'n_epochs': 1000, 'batch_size': 2048, 'dataloader_num_workers': 6,
+                      'test_batch_size': 512, 'topks': [20]}
+    yelp_config.append((dataset_config, model_config, trainer_config))
+
     dataset_config = dataset_config.copy()
     dataset_config['neg_ratio'] = 4
     model_config = {'name': 'NeuMF', 'embedding_size': 64, 'device': device, 'layer_sizes': [64, 64, 64]}
@@ -103,6 +117,13 @@ def get_ml1m_config(device):
     model_config = {'name': 'ItemKNN', 'k': 1000, 'device': device}
     trainer_config = {'name': 'BasicTrainer',  'n_epochs': 0, 'test_batch_size': 512,
                       'topks': [20, 100], 'device': device}
+    ml1m_config.append((dataset_config, model_config, trainer_config))
+
+    model_config = {'name': 'NGCF', 'embedding_size': 64, 'layer_sizes': [64, 64, 64],
+                    'device': device, 'dropout': 0.1}
+    trainer_config = {'name': 'BPRTrainer', 'optimizer': 'Adam', 'lr': 1.e-3, 'l2_reg': 1.e-3,
+                      'device': device, 'n_epochs': 1000, 'batch_size': 2048, 'dataloader_num_workers': 6,
+                      'test_batch_size': 512, 'topks': [20]}
     ml1m_config.append((dataset_config, model_config, trainer_config))
 
     dataset_config = dataset_config.copy()

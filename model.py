@@ -345,8 +345,107 @@ class IGCN(BasicModel):
         self.load_state_dict(params['sate_dict'])
         self.user_map = params['user_map']
         self.item_map = params['item_map']
-        self.norm_adj = self.generate_graph(self.config['dataset'])
         self.feat_mat, _, _ = self.generate_feat(self.config['dataset'], is_updating=True)
+
+
+class IMF(BasicModel):
+    def __init__(self, model_config):
+        super(IMF, self).__init__(model_config)
+        self.embedding_size = model_config['embedding_size']
+        self.feature_ratio = model_config['feature_ratio']
+        self.dropout = model_config['dropout']
+        self.feat_mat, self.user_map, self.item_map = IGCN.generate_feat(self, model_config['dataset'])
+
+        self.dense_layer = nn.Linear(self.feat_mat.shape[1], self.embedding_size)
+        normal_(self.dense_layer.weight, std=0.1)
+        zeros_(self.dense_layer.bias)
+        self.to(device=self.device)
+
+    def get_rep(self):
+        feat_mat = NGCF.dropout_sp_mat(self, self.feat_mat)
+        representations = torch.sparse.mm(feat_mat, self.dense_layer.weight.t()) + self.dense_layer.bias[None, :]
+        return representations
+
+    def bpr_forward(self, users, pos_items, neg_items):
+        return IGCN.bpr_forward(self, users, pos_items, neg_items)
+
+    def predict(self, users):
+        return IGCN.predict(self, users)
+
+    def save(self, path):
+        IGCN.save(self, path)
+
+    def load(self, path):
+        IGCN.load(self, path)
+
+
+class MultiVAE(BasicModel):
+    def __init__(self, model_config):
+        super(MultiVAE, self).__init__(model_config)
+        self.dropout = model_config['dropout']
+        self.normalized_data_mat = self.get_data_mat(model_config['dataset'])
+
+        self.e_layer_sizes = model_config['layer_sizes'].copy()
+        self.e_layer_sizes.insert(0, self.data_mat.shape[0])
+        self.d_layer_sizes = self.e_layer_sizes[::-1].copy()
+        self.mid_size = self.e_layer_sizes[-1]
+        self.e_layer_sizes[-1] = self.mid_size * 2
+        self.encoder_layers = []
+        self.decoder_layers = []
+        for layer_idx in range(1, len(self.e_layer_sizes)):
+            encoder_layer = nn.Linear(self.e_layer_sizes[layer_idx - 1], self.e_layer_sizes[layer_idx])
+            self.encoder_layers.append(encoder_layer)
+            decoder_layer = nn.Linear(self.d_layer_sizes[layer_idx - 1], self.d_layer_sizes[layer_idx])
+            self.decoder_layers.append(decoder_layer)
+        self.encoder_layers = nn.ModuleList(self.encoder_layers)
+        self.decoder_layers = nn.ModuleList(self.decoder_layers)
+        for layer in self.encoder_layers:
+            kaiming_uniform_(layer.weight, nonlinearity='tanh')
+            zeros_(layer.bias)
+        for layer in self.decoder_layers:
+            kaiming_uniform_(layer.weight, nonlinearity='tanh')
+            zeros_(layer.bias)
+        self.to(device=self.device)
+
+    def get_data_mat(self, dataset):
+        data_mat = sp.coo_matrix((np.ones((len(dataset.train_array),)), np.array(dataset.train_array).T),
+                                 shape=(self.n_users, self.n_items), dtype=np.float32).tocsr()
+
+        degree = np.array(np.sum(data_mat, axis=1)).squeeze()
+        d_inv = np.power(degree, -0.5)
+        d_mat = sp.diags(d_inv, format='csr', dtype=np.float32)
+        normalized_data_mat = d_mat.dot(data_mat)
+        return normalized_data_mat
+
+    def ml_forward(self, users):
+        users = users.cpu().numpy()
+        profiles = self.normalized_data_mat[users, :]
+        representations = get_sparse_tensor(profiles, self.device)
+
+        representations = NGCF.dropout_sp_mat(self, representations)
+        representations = torch.sparse.mm(representations, self.encoder_layers[0].weight.t())
+        representations += self.encoder_layers[0].bias[None, :]
+        l2_norm_sq = torch.norm(self.encoder_layers[0].weight, p=2)[None] ** 2
+        for layer in self.encoder_layers[1:]:
+            representations = layer(F.tanh(representations))
+            l2_norm_sq += torch.norm(layer.weight, p=2)[None] ** 2
+
+        mean, log_var = representations[:, :self.mid_size], representations[:, -self.mid_size:]
+        std = torch.exp(0.5 * log_var)
+        kl = torch.sum(-log_var + torch.exp(log_var) + mean ** 2, dim=1)
+        epsilon = torch.randn(mean.shape[0], mean.shape[1])
+        representations = mean + self.training.float() * epsilon * std
+
+        for layer in self.decoder_layers[:-1]:
+            representations = F.tanh(layer(representations))
+            l2_norm_sq += torch.norm(layer.weight, p=2)[None] ** 2
+        scores = self.decoder_layers[-1](representations)
+        l2_norm_sq += torch.norm(self.decoder_layers[-1].weight, p=2)[None] ** 2
+        return scores, kl, l2_norm_sq
+
+    def predict(self, users):
+        scores, _, _ = self.ml_forward(users)
+        return scores
 
 
 class NeuMF(BasicModel):
@@ -408,4 +507,3 @@ class NeuMF(BasicModel):
         scores, _ = self.bce_forward(users, items)
         scores = scores.reshape(-1, self.n_items)
         return scores
-

@@ -36,45 +36,15 @@ def main():
     default_model = get_model(model_config, new_dataset)
     default_model.load('checkpoints/default.pth')
     default_trainer = get_trainer(trainer_config, new_dataset, default_model)
-    results, _ = trainer.eval('test')
-    print('All user test result. {:s}'.format(results))
-    results, _ = default_trainer.eval('test')
-    print('Default model all user test result. {:s}'.format(results))
-
-    test_data = new_dataset.test_data.copy()
-    for user in range(dataset.n_users, new_dataset.n_users):
-        new_dataset.test_data[user] = []
-    results, _ = trainer.eval('test')
-    print('Old user test result. {:s}'.format(results))
-    results, _ = default_trainer.eval('test')
-    print('Default model old user test result. {:s}'.format(results))
-
-    new_dataset.test_data = test_data.copy()
-    for user in range(dataset.n_users):
-        new_dataset.test_data[user] = []
-    results, _ = trainer.eval('test')
-    print('New user test result. {:s}'.format(results))
-    results, _ = default_trainer.eval('test')
-    print('Default model new user test result. {:s}'.format(results))
+    trainer.inductive_eval(dataset.n_users, dataset.n_items)
+    default_trainer.inductive_eval(dataset.n_users, dataset.n_items)
 
     writer = SummaryWriter(log_path)
     normal_(model.dense_layer.weight, std=0.1)
     zeros_(model.dense_layer.bias)
     trainer.train(verbose=True, writer=writer)
     writer.close()
-    print('Default model with partial features')
-    new_dataset.test_data = test_data.copy()
-    results, _ = trainer.eval('test')
-    print('All user test result. {:s}'.format(results))
-    for user in range(dataset.n_users, new_dataset.n_users):
-        new_dataset.test_data[user] = []
-    results, _ = trainer.eval('test')
-    print('Old user test result. {:s}'.format(results))
-    new_dataset.test_data = test_data.copy()
-    for user in range(dataset.n_users):
-        new_dataset.test_data[user] = []
-    results, _ = trainer.eval('test')
-    print('New user test result. {:s}'.format(results))
+    trainer.inductive_eval(dataset.n_users, dataset.n_items)
 
 
 if __name__ == '__main__':

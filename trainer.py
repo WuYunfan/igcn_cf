@@ -5,8 +5,9 @@ from torch.optim import Adam, SGD
 import time
 import numpy as np
 import os
-from utils import AverageMeter
+from utils import AverageMeter, get_sparse_tensor
 import torch.nn.functional as F
+import scipy.sparse as sp
 
 
 def get_trainer(config, dataset, model):
@@ -167,6 +168,38 @@ class BasicTrainer:
         results = 'Precision: {:s}Recall: {:s}NDCG: {:s}'.format(precison, recall, ndcg)
         return results, metrics
 
+    def inductive_eval(self, n_old_users, n_old_items):
+        test_data = self.dataset.test_data.copy()
+
+        results, _ = self.eval('test')
+        print('All users and all items result. {:s}'.format(results))
+
+        for user in range(n_old_users, self.dataset.n_users):
+            self.dataset.test_data[user] = []
+        results, _ = self.eval('test')
+        print('Old users and all items result. {:s}'.format(results))
+
+        self.dataset.test_data = test_data.copy()
+        for user in range(n_old_users):
+            self.dataset.test_data[user] = []
+        results, _ = self.eval('test')
+        print('New users and all items result. {:s}'.format(results))
+
+        self.dataset.test_data = test_data.copy()
+        for user in range(self.dataset.n_users):
+            test_items = np.array(self.dataset.test_data[user])
+            self.dataset.test_data[user] = test_items[test_items < n_old_items].tolist()
+        results, _ = self.eval('test')
+        print('All users and old items result. {:s}'.format(results))
+
+        self.dataset.test_data = test_data.copy()
+        for user in range(self.dataset.n_users):
+            test_items = np.array(self.dataset.test_data[user])
+            self.dataset.test_data[user] = test_items[test_items >= n_old_items].tolist()
+        results, _ = self.eval('test')
+        print('All users and new items result. {:s}'.format(results))
+        self.dataset.test_data = test_data.copy()
+
 
 class BPRTrainer(BasicTrainer):
     def __init__(self, trainer_config):
@@ -245,4 +278,40 @@ class BCETrainer(BasicTrainer):
         return losses.avg
 
 
+class MLTrainer(BasicTrainer):
+    def __init__(self, trainer_config):
+        super(MLTrainer, self).__init__(trainer_config)
+
+        train_user = TensorDataset(torch.arange(self.dataset.n_users, dtype=torch.int64, device=self.device))
+        self.train_user_loader = DataLoader(train_user, batch_size=trainer_config['batch_size'], shuffle=True)
+        self.data_mat = sp.coo_matrix((np.ones((len(self.dataset.train_array),)), np.array(self.dataset.train_array).T),
+                                      shape=(self.dataset.n_users, self.dataset.n_items), dtype=np.float32).tocsr()
+        self.opt = getattr(sys.modules[__name__], trainer_config['optimizer'])
+        self.opt = self.opt(self.model.parameters(), lr=trainer_config['lr'])
+        self.l2_reg = trainer_config['l2_reg']
+        self.kl_reg = trainer_config['kl_reg']
+        anneal_step_ratio = trainer_config.get('anneal_step_ratio', 0.2)
+        self.anneal_epochs = int(anneal_step_ratio * self.n_epochs)
+
+    def train_one_epoch(self):
+        kl_reg = min(self.kl_reg, 1. * self.epoch / self.anneal_epochs)
+
+        losses = AverageMeter()
+        for users in self.train_user_loader:
+            users = users[0]
+            users = users.cpu().numpy()
+            profiles = self.data_mat[users, :]
+            profiles = get_sparse_tensor(profiles, self.device)
+
+            scores, kl, l2_norm_sq = self.model.ml_forward(users)
+            scores = F.log_softmax(scores, dim=1)
+            ml_loss = torch.sum(profiles * scores, dim=1).mean()
+
+            reg_loss = kl_reg * kl.mean() + self.l2_reg * l2_norm_sq.mean()
+            loss = ml_loss + reg_loss
+            self.opt.zero_grad()
+            loss.backward()
+            self.opt.step()
+            losses.update(loss.item(), users.shape[0])
+        return losses.avg
 

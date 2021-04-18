@@ -29,8 +29,13 @@ def main():
     new_dataset = get_dataset(dataset_config)
     model.config['dataset'] = new_dataset
     model.n_users, model.n_items = new_dataset.n_users, new_dataset.n_items
-    model.norm_adj = model.generate_graph(new_dataset)
-    model.feat_mat, _, _ = model.generate_feat(new_dataset, is_updating=True)
+    with torch.no_grad():
+        old_embedding = model.embedding.weight
+        model.embedding = torch.nn.Embedding(new_dataset.n_users + new_dataset.n_items, model.embedding_size)
+        zeros_(model.embedding.weight)
+        model.embedding.weight[:dataset.n_users, :] = old_embedding[:dataset.n_users, :]
+        model.embedding.weight[new_dataset.n_users:new_dataset.n_users + dataset.n_items, :] = \
+            old_embedding[dataset.n_users:, :]
     trainer = get_trainer(trainer_config, new_dataset, model)
 
     default_model = get_model(model_config, new_dataset)
@@ -40,14 +45,6 @@ def main():
     trainer.inductive_eval(dataset.n_users, dataset.n_items)
     print('Full model results.')
     default_trainer.inductive_eval(dataset.n_users, dataset.n_items)
-
-    writer = SummaryWriter(log_path)
-    normal_(model.dense_layer.weight, std=0.1)
-    zeros_(model.dense_layer.bias)
-    trainer.train(verbose=True, writer=writer)
-    writer.close()
-    print('Retraining results.')
-    trainer.inductive_eval(dataset.n_users, dataset.n_items)
 
 
 if __name__ == '__main__':

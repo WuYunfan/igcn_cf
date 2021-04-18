@@ -354,12 +354,15 @@ class IMF(BasicModel):
         self.embedding_size = model_config['embedding_size']
         self.feature_ratio = model_config['feature_ratio']
         self.dropout = model_config['dropout']
-        self.feat_mat, self.user_map, self.item_map = IGCN.generate_feat(self, model_config['dataset'])
+        self.feat_mat, self.user_map, self.item_map = self.generate_feat(model_config['dataset'])
 
         self.dense_layer = nn.Linear(self.feat_mat.shape[1], self.embedding_size)
         normal_(self.dense_layer.weight, std=0.1)
         zeros_(self.dense_layer.bias)
         self.to(device=self.device)
+
+    def generate_feat(self, dataset):
+        return IGCN.generate_feat(self, dataset)
 
     def get_rep(self):
         feat_mat = NGCF.dropout_sp_mat(self, self.feat_mat)

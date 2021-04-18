@@ -4,7 +4,10 @@ from trainer import get_trainer
 import torch
 from utils import init_run, set_seed
 from tensorboardX import SummaryWriter
+from torch.nn.init import normal_, zeros_
 from config import get_gowalla_config, get_yelp_config, get_ml1m_config
+import numpy as np
+import scipy.sparse as sp
 
 
 def main():
@@ -14,26 +17,24 @@ def main():
     device = torch.device('cuda')
     config = get_gowalla_config(device)
     dataset_config, model_config, trainer_config = config[2]
-    dataset_config['path'] = 'data/LGCN/gowalla_it_0_8'
+    dataset_config['path'] = 'data/LGCN/gowalla_ui_0_8'
 
-    writer = SummaryWriter(log_path)
     dataset = get_dataset(dataset_config)
     model = get_model(model_config, dataset)
-    trainer = get_trainer(trainer_config, dataset, model)
-    trainer.train(verbose=True, writer=writer)
-    writer.close()
 
+    set_seed(2021)
     dataset_config['path'] = 'data/LGCN/gowalla'
     new_dataset = get_dataset(dataset_config)
     model.config['dataset'] = new_dataset
+    model.n_users, model.n_items = new_dataset.n_users, new_dataset.n_items
+    data_mat = sp.coo_matrix((np.ones((len(new_dataset.train_array),)), np.array(new_dataset.train_array).T),
+                             shape=(new_dataset.n_users, new_dataset.n_items), dtype=np.float32).tocsr()
+    model.data_mat = data_mat
+    sim_mat = sp.coo_matrix((model.sim_mat.data, (model.sim_mat.row, model.sim_mat.col)),
+                            shape=(new_dataset.n_items, new_dataset.n_items))
+    model.sim_mat = sim_mat
     trainer = get_trainer(trainer_config, new_dataset, model)
-    results, _ = trainer.eval('test')
-    print('Previous interactions test result. {:s}'.format(results))
-
-    model.norm_adj = model.generate_graph(new_dataset)
-    model.feat_mat, _, _ = model.generate_feat(new_dataset, is_updating=True)
-    results, _ = trainer.eval('test')
-    print('Updated interactions test result. {:s}'.format(results))
+    trainer.inductive_eval(dataset.n_users, dataset.n_items)
 
 
 if __name__ == '__main__':

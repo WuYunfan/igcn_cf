@@ -13,7 +13,7 @@ def main():
 
     device = torch.device('cuda')
     config = get_gowalla_config(device)
-    dataset_config, model_config, trainer_config = config[1]
+    dataset_config, model_config, trainer_config = config[2]
     dataset_config['path'] = 'data/LGCN/gowalla_it_0_8'
 
     writer = SummaryWriter(log_path)
@@ -30,7 +30,7 @@ def main():
     results, _ = trainer.eval('test')
     print('Previous interactions test result. {:s}'.format(results))
 
-    model.norm_adj = model.generate_graph(new_dataset)
+    model.feat_mat, _, _ = model.generate_feat(new_dataset, is_updating=True)
     results, _ = trainer.eval('test')
     print('Updated interactions test result. {:s}'.format(results))
 

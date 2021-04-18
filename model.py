@@ -386,7 +386,7 @@ class MultiVAE(BasicModel):
         self.normalized_data_mat = self.get_data_mat(model_config['dataset'])
 
         self.e_layer_sizes = model_config['layer_sizes'].copy()
-        self.e_layer_sizes.insert(0, self.data_mat.shape[0])
+        self.e_layer_sizes.insert(0, self.data_mat.shape[1])
         self.d_layer_sizes = self.e_layer_sizes[::-1].copy()
         self.mid_size = self.e_layer_sizes[-1]
         self.e_layer_sizes[-1] = self.mid_size * 2
@@ -412,6 +412,7 @@ class MultiVAE(BasicModel):
                                  shape=(self.n_users, self.n_items), dtype=np.float32).tocsr()
 
         degree = np.array(np.sum(data_mat, axis=1)).squeeze()
+        degree = np.maximum(1., degree)
         d_inv = np.power(degree, -0.5)
         d_mat = sp.diags(d_inv, format='csr', dtype=np.float32)
         normalized_data_mat = d_mat.dot(data_mat)

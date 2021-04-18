@@ -301,7 +301,7 @@ class MLTrainer(BasicTrainer):
             users = users[0]
             users = users.cpu().numpy()
             profiles = self.data_mat[users, :]
-            profiles = get_sparse_tensor(profiles, self.device)
+            profiles = get_sparse_tensor(profiles, self.device).to_dense()
 
             scores, kl, l2_norm_sq = self.model.ml_forward(users)
             scores = F.log_softmax(scores, dim=1)

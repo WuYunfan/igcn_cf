@@ -31,7 +31,7 @@ def get_gowalla_config(device):
                     'device': device, 'dropout': 0.1}
     trainer_config = {'name': 'BPRTrainer', 'optimizer': 'Adam', 'lr': 1.e-3, 'l2_reg': 1.e-3,
                       'device': device, 'n_epochs': 1000, 'batch_size': 2048, 'dataloader_num_workers': 6,
-                      'test_batch_size': 512, 'topks': [20]}
+                      'test_batch_size': 512, 'topks': [20, 100]}
     gowalla_config.append((dataset_config, model_config, trainer_config))
 
     dataset_config = dataset_config.copy()
@@ -77,7 +77,7 @@ def get_yelp_config(device):
                     'device': device, 'dropout': 0.3}
     trainer_config = {'name': 'BPRTrainer', 'optimizer': 'Adam', 'lr': 1.e-3, 'l2_reg': 1.e-3,
                       'device': device, 'n_epochs': 1000, 'batch_size': 2048, 'dataloader_num_workers': 6,
-                      'test_batch_size': 512, 'topks': [20]}
+                      'test_batch_size': 512, 'topks': [20, 100]}
     yelp_config.append((dataset_config, model_config, trainer_config))
 
     dataset_config = dataset_config.copy()
@@ -123,7 +123,7 @@ def get_ml1m_config(device):
                     'device': device, 'dropout': 0.1}
     trainer_config = {'name': 'BPRTrainer', 'optimizer': 'Adam', 'lr': 1.e-3, 'l2_reg': 1.e-3,
                       'device': device, 'n_epochs': 1000, 'batch_size': 2048, 'dataloader_num_workers': 6,
-                      'test_batch_size': 512, 'topks': [20]}
+                      'test_batch_size': 512, 'topks': [20, 100]}
     ml1m_config.append((dataset_config, model_config, trainer_config))
 
     dataset_config = dataset_config.copy()

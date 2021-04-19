@@ -12,7 +12,7 @@ def fitness(lr, l2_reg, dropout):
     device = torch.device('cuda')
     dataset_config = {'name': 'LGCNDataset', 'path': 'data/LGCN/gowalla',
                       'device': device, 'val_ratio': 0.1}
-    model_config = {'name': 'MultiVAE', 'layer_sizes': [128, 64],
+    model_config = {'name': 'MultiVAE', 'layer_sizes': [64, 32],
                     'device': device, 'dropout': dropout}
     trainer_config = {'name': 'MLTrainer', 'optimizer': 'Adam', 'lr': lr, 'l2_reg': l2_reg, 'kl_reg': 0.2,
                       'device': device, 'n_epochs': 1000, 'batch_size': 2048, 'dataloader_num_workers': 6,

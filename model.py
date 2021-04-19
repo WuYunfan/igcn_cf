@@ -361,8 +361,8 @@ class IMF(BasicModel):
         zeros_(self.dense_layer.bias)
         self.to(device=self.device)
 
-    def generate_feat(self, dataset):
-        return IGCN.generate_feat(self, dataset)
+    def generate_feat(self, dataset, is_updating=False):
+        return IGCN.generate_feat(self, dataset, is_updating)
 
     def get_rep(self):
         feat_mat = NGCF.dropout_sp_mat(self, self.feat_mat)

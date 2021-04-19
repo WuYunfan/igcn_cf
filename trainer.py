@@ -299,13 +299,13 @@ class MLTrainer(BasicTrainer):
         losses = AverageMeter()
         for users in self.train_user_loader:
             users = users[0]
-            users = users.cpu().numpy()
-            profiles = self.data_mat[users, :]
-            profiles = get_sparse_tensor(profiles, self.device).to_dense()
 
             scores, kl, l2_norm_sq = self.model.ml_forward(users)
             scores = F.log_softmax(scores, dim=1)
-            ml_loss = torch.sum(profiles * scores, dim=1).mean()
+            users = users.cpu().numpy()
+            profiles = self.data_mat[users, :]
+            profiles = get_sparse_tensor(profiles, self.device).to_dense()
+            ml_loss = -torch.sum(profiles * scores, dim=1).mean()
 
             reg_loss = kl_reg * kl.mean() + self.l2_reg * l2_norm_sq.mean()
             loss = ml_loss + reg_loss

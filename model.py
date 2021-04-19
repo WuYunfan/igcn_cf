@@ -389,7 +389,7 @@ class MultiVAE(BasicModel):
         self.normalized_data_mat = self.get_data_mat(model_config['dataset'])
 
         self.e_layer_sizes = model_config['layer_sizes'].copy()
-        self.e_layer_sizes.insert(0, self.data_mat.shape[1])
+        self.e_layer_sizes.insert(0, self.normalized_data_mat.shape[1])
         self.d_layer_sizes = self.e_layer_sizes[::-1].copy()
         self.mid_size = self.e_layer_sizes[-1]
         self.e_layer_sizes[-1] = self.mid_size * 2
@@ -431,17 +431,17 @@ class MultiVAE(BasicModel):
         representations += self.encoder_layers[0].bias[None, :]
         l2_norm_sq = torch.norm(self.encoder_layers[0].weight, p=2)[None] ** 2
         for layer in self.encoder_layers[1:]:
-            representations = layer(F.tanh(representations))
+            representations = layer(torch.tanh(representations))
             l2_norm_sq += torch.norm(layer.weight, p=2)[None] ** 2
 
         mean, log_var = representations[:, :self.mid_size], representations[:, -self.mid_size:]
         std = torch.exp(0.5 * log_var)
         kl = torch.sum(-log_var + torch.exp(log_var) + mean ** 2, dim=1)
-        epsilon = torch.randn(mean.shape[0], mean.shape[1])
-        representations = mean + self.training.float() * epsilon * std
+        epsilon = torch.randn(mean.shape[0], mean.shape[1], device=self.device)
+        representations = mean + float(self.training) * epsilon * std
 
         for layer in self.decoder_layers[:-1]:
-            representations = F.tanh(layer(representations))
+            representations = torch.tanh(layer(representations))
             l2_norm_sq += torch.norm(layer.weight, p=2)[None] ** 2
         scores = self.decoder_layers[-1](representations)
         l2_norm_sq += torch.norm(self.decoder_layers[-1].weight, p=2)[None] ** 2

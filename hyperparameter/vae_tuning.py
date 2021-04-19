@@ -14,8 +14,8 @@ def fitness(lr, l2_reg, dropout):
                       'device': device, 'val_ratio': 0.1}
     model_config = {'name': 'MultiVAE', 'layer_sizes': [128, 64],
                     'device': device, 'dropout': dropout}
-    trainer_config = {'name': 'MLTrainer', 'optimizer': 'Adam', 'lr': lr, 'l2_reg': l2_reg,
-                      'device': device, 'n_epochs': 1000, 'batch_size': 512, 'dataloader_num_workers': 6,
+    trainer_config = {'name': 'MLTrainer', 'optimizer': 'Adam', 'lr': lr, 'l2_reg': l2_reg, 'kl_reg': 0.2,
+                      'device': device, 'n_epochs': 1000, 'batch_size': 2048, 'dataloader_num_workers': 6,
                       'test_batch_size': 512, 'topks': [20]}
     dataset = get_dataset(dataset_config)
     model = get_model(model_config, dataset)

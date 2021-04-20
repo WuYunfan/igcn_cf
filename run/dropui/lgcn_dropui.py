@@ -37,14 +37,7 @@ def main():
         model.embedding.weight[new_dataset.n_users:new_dataset.n_users + dataset.n_items, :] = \
             old_embedding[dataset.n_users:, :]
     trainer = get_trainer(trainer_config, new_dataset, model)
-
-    default_model = get_model(model_config, new_dataset)
-    default_model.load('checkpoints/default.pth')
-    default_trainer = get_trainer(trainer_config, new_dataset, default_model)
-    print('Inductive results.')
     trainer.inductive_eval(dataset.n_users, dataset.n_items)
-    print('Full model results.')
-    default_trainer.inductive_eval(dataset.n_users, dataset.n_items)
 
 
 if __name__ == '__main__':

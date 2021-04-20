@@ -8,7 +8,7 @@ def dropit_dataset(dataset, ratio):
     for user in range(dataset.n_users):
         num_items = int(len(dataset.train_data[user]) * ratio)
         train_items = np.random.choice(dataset.train_data[user], size=num_items, replace=False)
-        dataset.train_data[user] = train_items.to_list()
+        dataset.train_data[user] = train_items.tolist()
 
 
 def main():

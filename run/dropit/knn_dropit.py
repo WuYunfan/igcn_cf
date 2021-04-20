@@ -15,7 +15,7 @@ def main():
 
     device = torch.device('cuda')
     config = get_gowalla_config(device)
-    dataset_config, model_config, trainer_config = config[2]
+    dataset_config, model_config, trainer_config = config[3]
     dataset_config['path'] = 'data/LGCN/gowalla_it_0_8'
 
     dataset = get_dataset(dataset_config)

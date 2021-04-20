@@ -27,7 +27,12 @@ def main():
     new_dataset = get_dataset(dataset_config)
     model.config['dataset'] = new_dataset
     model.n_users, model.n_items = new_dataset.n_users, new_dataset.n_items
-    model.normalized_data_mat = model.get_data_mat(new_dataset)
+    data_mat = model.get_data_mat(new_dataset)[:, dataset.n_items]
+    sq_sum = np.array(np.sum(data_mat ** 2, axis=1)).squeeze()
+    sq_sum[sq_sum == 0.] = 1.
+    denominator = np.power(sq_sum, -0.5)
+    d_mat = sp.diags(denominator, format='csr', dtype=np.float32)
+    model.normalized_data_mat = d_mat.dot(data_mat)
     trainer = get_trainer(trainer_config, new_dataset, model)
     trainer.inductive_eval(dataset.n_users, dataset.n_items)
 

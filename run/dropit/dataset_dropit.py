@@ -9,6 +9,7 @@ def dropit_dataset(dataset, ratio, random=True):
         num_items = int(len(dataset.train_data[user]) * ratio)
         if not random:
             dataset.train_data[user] = dataset.train_data[user][:num_items]
+            continue
         train_items = np.random.choice(dataset.train_data[user], size=num_items, replace=False)
         dataset.train_data[user] = train_items.tolist()
 

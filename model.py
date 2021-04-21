@@ -213,7 +213,8 @@ class ItemKNN(BasicModel):
         data = []
         for item in range(dataset.n_items):
             intersections = data_mat.T.dot(data_mat[:, item]).toarray().squeeze()
-            sims = intersections / (item_degree + item_degree[item] - intersections)
+            with np.errstate(invalid='ignore'):
+                sims = intersections / (item_degree + item_degree[item] - intersections)
             sims[np.isnan(sims)] = 0.
             row.extend([item] * self.k)
             topk_items = np.argsort(sims)[-self.k:]

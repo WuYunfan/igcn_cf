@@ -41,6 +41,13 @@ def get_gowalla_config(device):
                       'test_batch_size': 512, 'topks': [20, 100]}
     gowalla_config.append((dataset_config, model_config, trainer_config))
 
+    model_config = {'name': 'IMF', 'embedding_size': 64, 'device': device,
+                    'feature_ratio': 1., 'dropout': 0.1}
+    trainer_config = {'name': 'BPRTrainer', 'optimizer': 'Adam', 'lr': 1.e-3, 'l2_reg': 1.e-5,
+                      'device': device, 'n_epochs': 1000, 'batch_size': 2048, 'dataloader_num_workers': 6,
+                      'test_batch_size': 512, 'topks': [20, 100]}
+    gowalla_config.append((dataset_config, model_config, trainer_config))
+
     dataset_config = dataset_config.copy()
     dataset_config['neg_ratio'] = 4
     model_config = {'name': 'NeuMF', 'embedding_size': 64, 'device': device, 'layer_sizes': [64, 64, 64]}
@@ -94,6 +101,13 @@ def get_yelp_config(device):
                       'test_batch_size': 512, 'topks': [20, 100]}
     yelp_config.append((dataset_config, model_config, trainer_config))
 
+    model_config = {'name': 'IMF', 'embedding_size': 64, 'device': device,
+                    'feature_ratio': 1., 'dropout': 0.1}
+    trainer_config = {'name': 'BPRTrainer', 'optimizer': 'Adam', 'lr': 1.e-3, 'l2_reg': 1.e-5,
+                      'device': device, 'n_epochs': 1000, 'batch_size': 2048, 'dataloader_num_workers': 6,
+                      'test_batch_size': 512, 'topks': [20, 100]}
+    yelp_config.append((dataset_config, model_config, trainer_config))
+
     dataset_config = dataset_config.copy()
     dataset_config['neg_ratio'] = 4
     model_config = {'name': 'NeuMF', 'embedding_size': 64, 'device': device, 'layer_sizes': [64, 64, 64]}
@@ -143,6 +157,13 @@ def get_ml1m_config(device):
     model_config = {'name': 'MultiVAE', 'layer_sizes': [64, 32],
                     'device': device, 'dropout': 0.3}
     trainer_config = {'name': 'MLTrainer', 'optimizer': 'Adam', 'lr': 1.e-2, 'l2_reg': 1.e-3, 'kl_reg': 0.2,
+                      'device': device, 'n_epochs': 1000, 'batch_size': 2048, 'dataloader_num_workers': 6,
+                      'test_batch_size': 512, 'topks': [20, 100]}
+    ml1m_config.append((dataset_config, model_config, trainer_config))
+
+    model_config = {'name': 'IMF', 'embedding_size': 64, 'device': device,
+                    'feature_ratio': 1., 'dropout': 0.3}
+    trainer_config = {'name': 'BPRTrainer', 'optimizer': 'Adam', 'lr': 1.e-2, 'l2_reg': 0.,
                       'device': device, 'n_epochs': 1000, 'batch_size': 2048, 'dataloader_num_workers': 6,
                       'test_batch_size': 512, 'topks': [20, 100]}
     ml1m_config.append((dataset_config, model_config, trainer_config))

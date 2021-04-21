@@ -153,6 +153,8 @@ class LGCNDataset(BasicDataset):
         for user in range(self.n_users):
             val_items = np.random.choice(self.train_data[user], int(len(self.train_data[user]) * val_ratio), replace=False)
             val_items = val_items.tolist()
+            if 'ml1m' in dataset_config['path']:
+                val_items = self.train_data[user][-int(len(self.train_data[user]) * val_ratio):]
             self.train_data[user] = list(set(self.train_data[user]) - set(val_items))
             self.val_data.append(val_items)
 

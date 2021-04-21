@@ -4,9 +4,11 @@ from dataset import get_dataset
 from utils import set_seed, output_dataset
 
 
-def dropit_dataset(dataset, ratio):
+def dropit_dataset(dataset, ratio, random=True):
     for user in range(dataset.n_users):
         num_items = int(len(dataset.train_data[user]) * ratio)
+        if not random:
+            dataset.train_data[user] = dataset.train_data[user][:num_items]
         train_items = np.random.choice(dataset.train_data[user], size=num_items, replace=False)
         dataset.train_data[user] = train_items.tolist()
 

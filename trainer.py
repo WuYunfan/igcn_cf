@@ -147,7 +147,7 @@ class BasicTrainer:
                     for user_idx, user in enumerate(users):
                         items = self.dataset.train_data[user]
                         if val_or_test == 'test':
-                            items += self.dataset.val_data[user]
+                            items = items + self.dataset.val_data[user]
                         exclude_user_indexes.extend([user_idx] * len(items))
                         exclude_items.extend(items)
                     scores[exclude_user_indexes, exclude_items] = -np.inf

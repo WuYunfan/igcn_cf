@@ -42,6 +42,8 @@ def main():
     dataset_config = {'name': 'LGCNDataset', 'path': 'data/LGCN/gowalla',
                       'device': device, 'val_ratio': 0.}
     dataset = get_dataset(dataset_config)
+    shuffle_dataset(dataset)
+    output_dataset(dataset, 'data/LGCN/gowalla_shuffled')
     resize_dataset(dataset, 0.8)
     output_dataset(dataset, 'data/LGCN/gowalla_ui_0_8')
 

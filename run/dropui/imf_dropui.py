@@ -25,7 +25,7 @@ def main():
     writer.close()
 
     set_seed(2021)
-    dataset_config['path'] = 'data/LGCN/gowalla'
+    dataset_config['path'] = 'data/LGCN/gowalla_shuffled'
     new_dataset = get_dataset(dataset_config)
     model.config['dataset'] = new_dataset
     model.n_users, model.n_items = new_dataset.n_users, new_dataset.n_items

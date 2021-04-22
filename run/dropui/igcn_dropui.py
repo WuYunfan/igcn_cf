@@ -25,21 +25,15 @@ def main():
     writer.close()
 
     set_seed(2021)
-    dataset_config['path'] = 'data/LGCN/gowalla'
+    dataset_config['path'] = 'data/LGCN/gowalla_shuffled'
     new_dataset = get_dataset(dataset_config)
     model.config['dataset'] = new_dataset
     model.n_users, model.n_items = new_dataset.n_users, new_dataset.n_items
     model.norm_adj = model.generate_graph(new_dataset)
     model.feat_mat, _, _ = model.generate_feat(new_dataset, is_updating=True)
     trainer = get_trainer(trainer_config, new_dataset, model)
-
-    default_model = get_model(model_config, new_dataset)
-    default_model.load('checkpoints/default.pth')
-    default_trainer = get_trainer(trainer_config, new_dataset, default_model)
     print('Inductive results.')
     trainer.inductive_eval(dataset.n_users, dataset.n_items)
-    print('Full model results.')
-    default_trainer.inductive_eval(dataset.n_users, dataset.n_items)
 
     writer = SummaryWriter(log_path)
     normal_(model.dense_layer.weight, std=0.1)
@@ -47,6 +41,14 @@ def main():
     trainer.train(verbose=True, writer=writer)
     writer.close()
     print('Retraining results.')
+    trainer.inductive_eval(dataset.n_users, dataset.n_items)
+
+    writer = SummaryWriter(log_path)
+    model = get_model(model_config, new_dataset)
+    trainer = get_trainer(trainer_config, new_dataset, model)
+    trainer.train(verbose=True, writer=writer)
+    writer.close()
+    print('Full model results.')
     trainer.inductive_eval(dataset.n_users, dataset.n_items)
 
 

@@ -36,6 +36,7 @@ def main():
         model.embedding.weight[:dataset.n_users, :] = old_embedding[:dataset.n_users, :]
         model.embedding.weight[new_dataset.n_users:new_dataset.n_users + dataset.n_items, :] = \
             old_embedding[dataset.n_users:, :]
+        model.to(device)
     trainer = get_trainer(trainer_config, new_dataset, model)
     trainer.inductive_eval(dataset.n_users, dataset.n_items)
 

@@ -29,6 +29,7 @@ def main():
     new_dataset = get_dataset(dataset_config)
     model.config['dataset'] = new_dataset
     model.n_users, model.n_items = new_dataset.n_users, new_dataset.n_items
+    model.norm_adj = model.generate_graph(new_dataset)
     with torch.no_grad():
         old_embedding = model.embedding.weight
         model.embedding = torch.nn.Embedding(new_dataset.n_users + new_dataset.n_items, model.embedding_size)

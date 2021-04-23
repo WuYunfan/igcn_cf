@@ -205,6 +205,17 @@ class BasicTrainer:
 
         self.dataset.val_data = val_data.copy()
         self.dataset.test_data = test_data.copy()
+        for user in range(n_old_users, self.dataset.n_users):
+            self.dataset.test_data[user] = []
+        for user in range(n_old_users):
+            test_items = np.array(self.dataset.test_data[user])
+            self.dataset.test_data[user] = test_items[test_items < n_old_items].tolist()
+            self.dataset.val_data[user] = self.dataset.val_data[user] + test_items[test_items >= n_old_items].tolist()
+        results, _ = self.eval('test')
+        print('Old users and old items result. {:s}'.format(results))
+
+        self.dataset.val_data = val_data.copy()
+        self.dataset.test_data = test_data.copy()
 
 
 class BPRTrainer(BasicTrainer):

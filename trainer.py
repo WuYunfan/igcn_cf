@@ -169,6 +169,7 @@ class BasicTrainer:
         return results, metrics
 
     def inductive_eval(self, n_old_users, n_old_items):
+        val_data = self.dataset.val_data.copy()
         test_data = self.dataset.test_data.copy()
 
         results, _ = self.eval('test')
@@ -189,15 +190,20 @@ class BasicTrainer:
         for user in range(self.dataset.n_users):
             test_items = np.array(self.dataset.test_data[user])
             self.dataset.test_data[user] = test_items[test_items < n_old_items].tolist()
+            self.dataset.val_data[user] = self.dataset.val_data[user] + test_items[test_items >= n_old_items].tolist()
         results, _ = self.eval('test')
         print('All users and old items result. {:s}'.format(results))
 
+        self.dataset.val_data = val_data.copy()
         self.dataset.test_data = test_data.copy()
         for user in range(self.dataset.n_users):
             test_items = np.array(self.dataset.test_data[user])
             self.dataset.test_data[user] = test_items[test_items >= n_old_items].tolist()
+            self.dataset.val_data[user] = self.dataset.val_data[user] + test_items[test_items < n_old_items].tolist()
         results, _ = self.eval('test')
         print('All users and new items result. {:s}'.format(results))
+
+        self.dataset.val_data = val_data.copy()
         self.dataset.test_data = test_data.copy()
 
 

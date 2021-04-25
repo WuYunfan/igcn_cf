@@ -300,7 +300,7 @@ class IGCN(BasicModel):
         degree = np.array(np.sum(feat, axis=1)).squeeze()
         print('User feat number {:.3f}, Item feat number {:.3f}'
               .format(degree[:self.n_users].mean(), degree[self.n_users:].mean()))
-        feat = normalize(feat, axis=1, norm='l2')
+        feat = normalize(feat, axis=1, norm='l1')
         feat = get_sparse_tensor(feat, self.device)
         return feat, user_map, item_map
 

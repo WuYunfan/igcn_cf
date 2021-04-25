@@ -279,9 +279,9 @@ class IGCN(BasicModel):
         return norm_adj
 
     def generate_feat(self, dataset, is_updating=False):
-        sub_mat = sp.coo_matrix((np.ones((len(dataset.train_array),)), np.array(dataset.train_array).T),
-                                shape=(self.n_users, self.n_items), dtype=np.float32)
         if not is_updating:
+            sub_mat = sp.coo_matrix((np.ones((len(dataset.train_array),)), np.array(dataset.train_array).T),
+                                    shape=(self.n_users, self.n_items), dtype=np.float32)
             user_degree = np.array(np.sum(sub_mat, axis=1)).squeeze()
             popular_users = np.argsort(user_degree)[-int(self.n_users * self.feature_ratio):]
             print('User degree ratio {:.3f}%'.format(np.sum(user_degree[popular_users]) * 100. / np.sum(user_degree)))
@@ -311,7 +311,7 @@ class IGCN(BasicModel):
             indices.append([self.n_users + item, user_dim + item_dim + 1])
 
         feat = sp.coo_matrix((np.ones((len(indices),)), np.array(indices).T),
-                             shape=(self.n_users + self.n_items, user_dim + item_dim + 2), dtype=np.float32)
+                             shape=(self.n_users + self.n_items, user_dim + item_dim + 2), dtype=np.float32).tocsr()
         degree = np.array(np.sum(feat, axis=1)).squeeze()
         d_inv = np.power(degree, -1.)
         d_mat = sp.diags(d_inv, format='csr', dtype=np.float32)

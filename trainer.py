@@ -131,7 +131,7 @@ class BasicTrainer:
             results['NDCG'][k] = ndcgs[user_masks].mean()
         return results
 
-    def eval(self, val_or_test):
+    def eval(self, val_or_test, banned_items=None):
         self.model.eval()
         eval_data = getattr(self.dataset, val_or_test + '_data')
         rec_items = []
@@ -151,6 +151,8 @@ class BasicTrainer:
                         exclude_user_indexes.extend([user_idx] * len(items))
                         exclude_items.extend(items)
                     scores[exclude_user_indexes, exclude_items] = -np.inf
+                if banned_items is not None:
+                    scores[:, banned_items] = -np.inf
 
                 _, items = torch.topk(scores, k=max(self.topks))
                 rec_items.append(items.cpu().numpy())
@@ -169,7 +171,6 @@ class BasicTrainer:
         return results, metrics
 
     def inductive_eval(self, n_old_users, n_old_items):
-        val_data = self.dataset.val_data.copy()
         test_data = self.dataset.test_data.copy()
 
         results, _ = self.eval('test')
@@ -190,31 +191,25 @@ class BasicTrainer:
         for user in range(self.dataset.n_users):
             test_items = np.array(self.dataset.test_data[user])
             self.dataset.test_data[user] = test_items[test_items < n_old_items].tolist()
-            self.dataset.val_data[user] = self.dataset.val_data[user] + test_items[test_items >= n_old_items].tolist()
-        results, _ = self.eval('test')
+        results, _ = self.eval('test', banned_items=np.arange(n_old_items, self.dataset.n_items))
         print('All users and old items result. {:s}'.format(results))
 
-        self.dataset.val_data = val_data.copy()
         self.dataset.test_data = test_data.copy()
         for user in range(self.dataset.n_users):
             test_items = np.array(self.dataset.test_data[user])
             self.dataset.test_data[user] = test_items[test_items >= n_old_items].tolist()
-            self.dataset.val_data[user] = self.dataset.val_data[user] + test_items[test_items < n_old_items].tolist()
-        results, _ = self.eval('test')
+        results, _ = self.eval('test', banned_items=np.arange(n_old_items))
         print('All users and new items result. {:s}'.format(results))
 
-        self.dataset.val_data = val_data.copy()
         self.dataset.test_data = test_data.copy()
         for user in range(n_old_users, self.dataset.n_users):
             self.dataset.test_data[user] = []
         for user in range(n_old_users):
             test_items = np.array(self.dataset.test_data[user])
             self.dataset.test_data[user] = test_items[test_items < n_old_items].tolist()
-            self.dataset.val_data[user] = self.dataset.val_data[user] + test_items[test_items >= n_old_items].tolist()
-        results, _ = self.eval('test')
+        results, _ = self.eval('test', banned_items=np.arange(n_old_items, self.dataset.n_items))
         print('Old users and old items result. {:s}'.format(results))
 
-        self.dataset.val_data = val_data.copy()
         self.dataset.test_data = test_data.copy()
 
 

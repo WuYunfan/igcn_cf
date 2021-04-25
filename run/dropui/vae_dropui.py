@@ -19,8 +19,12 @@ def main():
     dataset_config, model_config, trainer_config = config[5]
     dataset_config['path'] = 'data/LGCN/gowalla_ui_0_8'
 
+    writer = SummaryWriter(log_path)
     dataset = get_dataset(dataset_config)
     model = get_model(model_config, dataset)
+    trainer = get_trainer(trainer_config, dataset, model)
+    trainer.train(verbose=True, writer=writer)
+    writer.close()
 
     dataset_config['path'] = 'data/LGCN/gowalla_shuffled'
     new_dataset = get_dataset(dataset_config)

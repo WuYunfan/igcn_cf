@@ -6,6 +6,7 @@ from utils import get_sparse_tensor
 from torch.nn.init import kaiming_uniform_, calculate_gain, normal_, zeros_, ones_
 import sys
 import torch.nn.functional as F
+from sklearn.preprocessing import normalize
 
 
 def get_model(config, dataset):
@@ -148,12 +149,10 @@ class NGCF(BasicModel):
         adj_mat = sp.lil_matrix((self.n_users + self.n_items, self.n_users + self.n_items), dtype=np.float32)
         adj_mat[:self.n_users, self.n_users:] = sub_mat
         adj_mat[self.n_users:, :self.n_users] = sub_mat.T
-        adj_mat = adj_mat + sp.eye(adj_mat.shape[0])
-        degree = np.array(np.sum(adj_mat, axis=1)).squeeze()
-        d_inv = np.power(degree, -1.)
-        d_mat = sp.diags(d_inv, format='csr', dtype=np.float32)
+        adj_mat = adj_mat.tocsr()
+        adj_mat = adj_mat + sp.eye(adj_mat.shape[0], format='csr')
 
-        norm_adj = d_mat.dot(adj_mat)
+        norm_adj = normalize(adj_mat, axis=1, norm='l1')
         norm_adj = get_sparse_tensor(norm_adj, self.device)
         return norm_adj
 
@@ -262,21 +261,7 @@ class IGCN(BasicModel):
         self.to(device=self.device)
 
     def generate_graph(self, dataset):
-        sub_mat = sp.coo_matrix((np.ones((len(dataset.train_array),)), np.array(dataset.train_array).T),
-                                shape=(self.n_users, self.n_items), dtype=np.float32)
-        adj_mat = sp.lil_matrix((self.n_users + self.n_items, self.n_users + self.n_items), dtype=np.float32)
-        adj_mat[:self.n_users, self.n_users:] = sub_mat
-        adj_mat[self.n_users:, :self.n_users] = sub_mat.T
-        adj_mat.tocsr()
-
-        degree = np.array(np.sum(adj_mat, axis=1)).squeeze()
-        degree = np.maximum(1., degree)
-        d_inv = np.power(degree, -0.5)
-        d_mat = sp.diags(d_inv, format='csr', dtype=np.float32)
-
-        norm_adj = d_mat.dot(adj_mat).dot(d_mat)
-        norm_adj = get_sparse_tensor(norm_adj, self.device)
-        return norm_adj
+        return LightGCN.generate_graph(self, dataset)
 
     def generate_feat(self, dataset, is_updating=False):
         if not is_updating:
@@ -313,9 +298,9 @@ class IGCN(BasicModel):
         feat = sp.coo_matrix((np.ones((len(indices),)), np.array(indices).T),
                              shape=(self.n_users + self.n_items, user_dim + item_dim + 2), dtype=np.float32).tocsr()
         degree = np.array(np.sum(feat, axis=1)).squeeze()
-        d_inv = np.power(degree, -1.)
-        d_mat = sp.diags(d_inv, format='csr', dtype=np.float32)
-        feat = d_mat.dot(feat)
+        print('User feat number {:.3f}, Item feat number {:.3f}'
+              .format(degree[:self.n_users].mean(), degree[self.n_users:].mean()))
+        feat = normalize(feat, axis=1, norm='l2')
         feat = get_sparse_tensor(feat, self.device)
         return feat, user_map, item_map
 
@@ -416,11 +401,7 @@ class MultiVAE(BasicModel):
         data_mat = sp.coo_matrix((np.ones((len(dataset.train_array),)), np.array(dataset.train_array).T),
                                  shape=(self.n_users, self.n_items), dtype=np.float32).tocsr()
 
-        degree = np.array(np.sum(data_mat, axis=1)).squeeze()
-        degree = np.maximum(1., degree)
-        d_inv = np.power(degree, -0.5)
-        d_mat = sp.diags(d_inv, format='csr', dtype=np.float32)
-        normalized_data_mat = d_mat.dot(data_mat)
+        normalized_data_mat = normalize(data_mat, axis=1, norm='l2')
         return normalized_data_mat
 
     def ml_forward(self, users):

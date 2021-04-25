@@ -73,8 +73,8 @@ class BasicDataset(Dataset):
             self.test_data[user] += [item for item in user_inter_lists[user][-n_test_items:]]
             self.train_array.extend([[user, item] for item in self.train_data[user]])
         average_inters = np.mean(average_inters)
-        print('Users {:d}, Items {:d}, Average number of interactions {:.3f}'
-              .format(self.n_users, self.n_items, average_inters))
+        print('Users {:d}, Items {:d}, Average number of interactions {:.3f}, Total interactions {:.3f}'
+              .format(self.n_users, self.n_items, average_inters, average_inters * self.n_users))
 
     def __len__(self):
         return len(self.train_array)

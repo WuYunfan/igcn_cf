@@ -433,7 +433,7 @@ class MultiVAE(BasicModel):
     def predict(self, users):
         scores, _, _ = self.ml_forward(users)
         if scores.shape[1] < self.n_items:
-            padding = torch.full([scores.shape[0], self.n_items - scores.shaep[1]], -np.inf, device=self.device)
+            padding = torch.full([scores.shape[0], self.n_items - scores.shape[1]], -np.inf, device=self.device)
             scores = torch.cat([scores, padding], dim=1)
         return scores
 

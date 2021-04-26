@@ -29,9 +29,10 @@ def main():
     data_mat = sp.coo_matrix((np.ones((len(new_dataset.train_array),)), np.array(new_dataset.train_array).T),
                              shape=(new_dataset.n_users, new_dataset.n_items), dtype=np.float32).tocsr()
     model.data_mat = data_mat
-    sim_mat = sp.coo_matrix((model.sim_mat.data, (model.sim_mat.row, model.sim_mat.col)),
+    sim_mat = model.sim_mat.tocoo()
+    sim_mat = sp.coo_matrix((sim_mat.data, (sim_mat.row, sim_mat.col)),
                             shape=(new_dataset.n_items, new_dataset.n_items))
-    model.sim_mat = sim_mat
+    model.sim_mat = sim_mat.tocsr()
     trainer = get_trainer(trainer_config, new_dataset, model)
     trainer.inductive_eval(dataset.n_users, dataset.n_items)
 

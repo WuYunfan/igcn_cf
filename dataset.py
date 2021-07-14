@@ -29,29 +29,29 @@ class BasicDataset(Dataset):
         self.train_array = None
         print('init dataset ' + dataset_config['name'])
 
-    def remove_sparse_ui(self, user_inter_set, item_inter_set):
+    def remove_sparse_ui(self, user_inter_sets, item_inter_sets):
         not_stop = True
         while not_stop:
             not_stop = False
-            for user in user_inter_set:
-                if len(user_inter_set[user]) < self.min_interactions:
+            users = list(user_inter_sets.keys())
+            for user in users:
+                if len(user_inter_sets[user]) < self.min_interactions:
                     not_stop = True
-                    for item in user_inter_set[user]:
-                        item_inter_set[item].remove(user)
-                    user_inter_set.pop(user)
-                    break
-            for item in item_inter_set:
-                if len(item_inter_set[item]) < self.min_interactions:
+                    for item in user_inter_sets[user]:
+                        item_inter_sets[item].remove(user)
+                    user_inter_sets.pop(user)
+            items = list(item_inter_sets.keys())
+            for item in items:
+                if len(item_inter_sets[item]) < self.min_interactions:
                     not_stop = True
-                    for user in item_inter_set[item]:
-                        user_inter_set[user].remove(item)
-                    item_inter_set.pop(item)
-                    break
+                    for user in item_inter_sets[item]:
+                        user_inter_sets[user].remove(item)
+                    item_inter_sets.pop(item)
         user_map = dict()
-        for idx, user in enumerate(user_inter_set):
+        for idx, user in enumerate(user_inter_sets):
             user_map[user] = idx
         item_map = dict()
-        for idx, item in enumerate(item_inter_set):
+        for idx, item in enumerate(item_inter_sets):
             item_map[item] = idx
         self.n_users = len(user_map)
         self.n_items = len(item_map)
@@ -167,7 +167,7 @@ class LGCNDataset(BasicDataset):
         with open(file_path, 'r') as f:
             lines = f.read().strip().split('\n')
         for line in lines:
-            items = line.split(' ')[1:]
+            items = line.strip().split(' ')[1:]
             items = [int(item) for item in items]
             if items:
                 self.n_items = max(self.n_items, max(items) + 1)

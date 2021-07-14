@@ -7,6 +7,8 @@ from torch.nn.init import kaiming_uniform_, calculate_gain, normal_, zeros_, one
 import sys
 import torch.nn.functional as F
 from sklearn.preprocessing import normalize
+import torch_sparse
+import torch_scatter
 
 
 def get_model(config, dataset):
@@ -255,9 +257,12 @@ class IGCN(BasicModel):
         self.norm_adj = self.generate_graph(model_config['dataset'])
         self.feat_mat, self.user_map, self.item_map = self.generate_feat(model_config['dataset'])
 
-        self.dense_layer = nn.Linear(self.feat_mat.shape[1], self.embedding_size)
-        normal_(self.dense_layer.weight, std=0.1)
-        zeros_(self.dense_layer.bias)
+        self.embedding_q = nn.Embedding(self.feat_mat.shape[1], self.embedding_size)
+        self.embedding_k = nn.Embedding(self.feat_mat.shape[1], self.embedding_size)
+        self.embedding_v = nn.Embedding(self.feat_mat.shape[1], self.embedding_size)
+        normal_(self.embedding_q.weight, std=0.1)
+        normal_(self.embedding_k.weight, std=0.1)
+        normal_(self.embedding_v.weight, std=0.1)
         self.to(device=self.device)
 
     def generate_graph(self, dataset):
@@ -306,12 +311,26 @@ class IGCN(BasicModel):
 
     def get_rep(self):
         feat_mat = NGCF.dropout_sp_mat(self, self.feat_mat)
-        representations = torch.sparse.mm(feat_mat, self.dense_layer.weight.t()) + self.dense_layer.bias[None, :]
+
+        x_q = torch_sparse.spmm(feat_mat.indices(), feat_mat.values(), feat_mat.shape[0], feat_mat.shape[1],
+                                self.embedding_q.weight)
+        row, column = feat_mat.indices()
+        x_q = torch.index_select(x_q, 0, row)
+        x_k = torch.index_select(self.embedding_k.weight, 0, column)
+        alpha = (x_q * x_k).sum(1)
+        row_min_alpha = torch_scatter.scatter(alpha, row, dim=0, reduce='min')
+        alpha = alpha - row_min_alpha[row]
+        alpha = torch.exp(alpha)
+        row_sum_alpha = torch_scatter.scatter(alpha, row, dim=0, reduce='sum')
+        alpha = alpha / row_sum_alpha[row]
+        representations = torch_sparse.spmm(feat_mat.indices(), alpha, feat_mat.shape[0], feat_mat.shape[1],
+                                            self.embedding_v.weight)
 
         all_layer_rep = [representations]
         dropped_adj = NGCF.dropout_sp_mat(self, self.norm_adj)
         for _ in range(self.n_layers):
-            representations = torch.sparse.mm(dropped_adj, representations)
+            representations = torch_sparse.spmm(dropped_adj.indices(), dropped_adj.values(),
+                                                dropped_adj.shape[0], dropped_adj.shape[1], representations)
             all_layer_rep.append(representations)
         all_layer_rep = torch.stack(all_layer_rep, dim=0)
         final_rep = all_layer_rep.mean(dim=0)

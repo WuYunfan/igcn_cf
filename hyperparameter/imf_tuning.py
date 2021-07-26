@@ -10,8 +10,8 @@ from trainer import get_trainer
 def fitness(lr, l2_reg, dropout):
     set_seed(2021)
     device = torch.device('cuda')
-    dataset_config = {'name': 'LGCNDataset', 'path': 'data/LGCN/gowalla',
-                      'device': device, 'val_ratio': 0.1}
+    dataset_config = {'name': 'GowallaDataset', 'path': 'data/Gowalla',
+                      'device': device, 'split_ratio': [0.7, 0.1, 0.2]}
     model_config = {'name': 'IMF', 'embedding_size': 64, 'device': device,
                     'feature_ratio': 1., 'dropout': dropout}
     trainer_config = {'name': 'BPRTrainer', 'optimizer': 'Adam', 'lr': lr, 'l2_reg': l2_reg,
@@ -26,7 +26,7 @@ def fitness(lr, l2_reg, dropout):
 def main():
     log_path = __file__[:-3]
     init_run(log_path, 2021)
-    param_grid = {'lr': [1.e-3, 1.e-2], 'l2_reg': [0., 1.e-5], 'dropout': [0.1, 0.3, 0.5]}
+    param_grid = {'lr': [1.e-3, 1.e-2], 'l2_reg': [0., 1.e-5, 1.e-4], 'dropout': [0., 0.1, 0.3]}
     grid = ParameterGrid(param_grid)
     max_ndcg = -np.inf
     best_params = None

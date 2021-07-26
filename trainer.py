@@ -243,6 +243,24 @@ class BPRTrainer(BasicTrainer):
         return losses.avg
 
 
+class IGCNTrainer(BasicTrainer):
+    def __init__(self, trainer_config):
+        super(IGCNTrainer, self).__init__(trainer_config)
+
+        self.dataloader = DataLoader(self.dataset, batch_size=trainer_config['batch_size'],
+                                     num_workers=trainer_config['dataloader_num_workers'])
+        opt = getattr(sys.modules[__name__], trainer_config['optimizer'])
+        self.opt = opt([self.model.embedding.weight], lr=trainer_config['lr'])
+        self.opt_w = opt([self.model.weight_q.weight, self.model.weight_k.weight], lr=trainer_config['lr'])
+        self.l2_reg = trainer_config['l2_reg']
+
+    def train_one_epoch(self):
+        self.opt_w.zero_grad()
+        loss = BPRTrainer.train_one_epoch(self)
+        self.opt_w.step()
+        return loss
+
+
 class BCETrainer(BasicTrainer):
     def __init__(self, trainer_config):
         super(BCETrainer, self).__init__(trainer_config)

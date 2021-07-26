@@ -3,6 +3,7 @@ import numpy as np
 from torch.utils.data import Dataset
 import random
 import sys
+import time
 
 
 def get_dataset(config):
@@ -94,19 +95,17 @@ class BasicDataset(Dataset):
         return data_with_negs
 
 
-class ML1MDataset(BasicDataset):
+class GowallaDataset(BasicDataset):
     def __init__(self, dataset_config):
-        super(ML1MDataset, self).__init__(dataset_config)
+        super(GowallaDataset, self).__init__(dataset_config)
 
-        rating_file_path = os.path.join(dataset_config['path'], 'ratings.dat')
+        rating_file_path = os.path.join(dataset_config['path'], 'Gowalla_totalCheckins.txt')
         user_inter_sets, item_inter_sets = dict(), dict()
         with open(rating_file_path, 'r') as f:
             lines = f.read().strip().split('\n')
         for line in lines:
-            u, i, r, _ = line.split('::')
-            u, i, r = int(u), int(i), int(r)
-            if r < 4:
-                continue
+            u, _, _, _, i = line.strip().split('\t')
+            u, i = int(u), int(i)
             if u in user_inter_sets:
                 user_inter_sets[u].add(i)
             else:
@@ -119,9 +118,11 @@ class ML1MDataset(BasicDataset):
 
         user_inter_lists = [[] for _ in range(self.n_users)]
         for line in lines:
-            u, i, r, t = line.split('::')
-            u, i, r, t = int(u), int(i), int(r), int(t)
-            if r > 3 and u in user_map and i in item_map:
+            u, t, _, _, i = line.split('\t')
+            t = time.strptime(t, '%Y-%m-%dT%H:%M:%SZ')
+            t = int(time.mktime(t))
+            u, i = int(u), int(i)
+            if u in user_map and i in item_map:
                 duplicate = False
                 for i_t in user_inter_lists[user_map[u]]:
                     if i_t[0] == item_map[i]:
@@ -134,42 +135,3 @@ class ML1MDataset(BasicDataset):
             user_inter_lists[user].sort(key=lambda entry: entry[1])
             user_inter_lists[user] = [i_t[0] for i_t in user_inter_lists[user]]
         self.generate_data(user_inter_lists)
-
-
-class LGCNDataset(BasicDataset):
-    def __init__(self, dataset_config):
-        super(LGCNDataset, self).__init__(dataset_config)
-
-        val_ratio = dataset_config['val_ratio']
-        train_file_path = os.path.join(dataset_config['path'], 'train.txt')
-        test_file_path = os.path.join(dataset_config['path'], 'test.txt')
-        self.n_items = 0
-        self.train_data = self.read_data(train_file_path)
-        self.test_data = self.read_data(test_file_path)
-        assert len(self.train_data) == len(self.test_data)
-        self.n_users = len(self.train_data)
-
-        self.val_data = []
-        for user in range(self.n_users):
-            val_items = np.random.choice(self.train_data[user], int(len(self.train_data[user]) * val_ratio), replace=False)
-            val_items = val_items.tolist()
-            if 'ml1m' in dataset_config['path']:
-                val_items = self.train_data[user][-int(len(self.train_data[user]) * val_ratio):]
-            self.train_data[user] = list(set(self.train_data[user]) - set(val_items))
-            self.val_data.append(val_items)
-
-        self.train_array = []
-        for user in range(self.n_users):
-            self.train_array.extend([[user, item] for item in self.train_data[user]])
-
-    def read_data(self, file_path):
-        data = []
-        with open(file_path, 'r') as f:
-            lines = f.read().strip().split('\n')
-        for line in lines:
-            items = line.strip().split(' ')[1:]
-            items = [int(item) for item in items]
-            if items:
-                self.n_items = max(self.n_items, max(items) + 1)
-            data.append(items)
-        return data

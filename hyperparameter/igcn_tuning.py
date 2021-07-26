@@ -10,10 +10,10 @@ from trainer import get_trainer
 def fitness(lr, l2_reg, dropout):
     set_seed(2021)
     device = torch.device('cuda')
-    dataset_config = {'name': 'LGCNDataset', 'path': 'data/LGCN/gowalla',
-                      'device': device, 'val_ratio': 0.1}
+    dataset_config = {'name': 'GowallaDataset', 'path': 'data/Gowalla',
+                      'device': device, 'split_ratio': [0.7, 0.1, 0.2]}
     model_config = {'name': 'IGCN', 'embedding_size': 64, 'n_layers': 3, 'device': device,
-                    'dropout': dropout, 'feature_ratio': 1.}
+                    'dropout': dropout, 'feature_ratio': 1., 'n_heads': 8, 'attention_size': 32}
     trainer_config = {'name': 'BPRTrainer', 'optimizer': 'Adam', 'lr': lr, 'l2_reg': l2_reg,
                       'device': device, 'n_epochs': 1000, 'batch_size': 2048, 'dataloader_num_workers': 6,
                       'test_batch_size': 512, 'topks': [20]}
@@ -26,7 +26,7 @@ def fitness(lr, l2_reg, dropout):
 def main():
     log_path = __file__[:-3]
     init_run(log_path, 2021)
-    param_grid = {'lr': [1.e-3, 1.e-2], 'l2_reg': [0., 1.e-5], 'dropout': [0.3, 0.5, 0.7]}
+    param_grid = {'lr': [1.e-3], 'l2_reg': [0., 1.e-5, 1.e-4], 'dropout': [0.3, 0.5, 0.7]}
     grid = ParameterGrid(param_grid)
     max_ndcg = -np.inf
     best_params = None

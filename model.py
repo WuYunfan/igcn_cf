@@ -8,6 +8,7 @@ import sys
 import torch.nn.functional as F
 from sklearn.preprocessing import normalize
 import dgl
+from torch.utils.checkpoint import checkpoint
 
 
 def get_model(config, dataset):
@@ -250,23 +251,21 @@ class IGCN(BasicModel):
     def __init__(self, model_config):
         super(IGCN, self).__init__(model_config)
         self.embedding_size = model_config['embedding_size']
+        self.attention_size = model_config['attention_size']
         self.n_layers = model_config['n_layers']
         self.n_heads = model_config['n_heads']
         self.dropout = model_config['dropout']
         self.feature_ratio = model_config['feature_ratio']
+        self.size_chunk = model_config.get('size_chunk', int(1e5))
         self.norm_adj = self.generate_graph(model_config['dataset'])
         self.feat_mat, self.user_map, self.item_map = self.generate_feat(model_config['dataset'])
 
         self.embedding = nn.Embedding(self.feat_mat.shape[1], self.embedding_size)
-        self.weight_q = nn.Linear(self.embedding_size, self.embedding_size * self.n_heads, bias=False)
-        self.weight_k = nn.Linear(self.embedding_size, self.embedding_size * self.n_heads, bias=False)
-        self.weight_v = nn.Linear(self.embedding_size, self.embedding_size * self.n_heads, bias=False)
-        self.weight_o = nn.Linear(self.embedding_size * self.n_heads, self.embedding_size, bias=False)
+        self.weight_q = nn.Linear(self.embedding_size, self.attention_size * self.n_heads, bias=False)
+        self.weight_k = nn.Linear(self.embedding_size, self.attention_size * self.n_heads, bias=False)
         kaiming_uniform_(self.embedding.weight)
         kaiming_uniform_(self.weight_q.weight)
         kaiming_uniform_(self.weight_k.weight)
-        kaiming_uniform_(self.weight_v.weight)
-        kaiming_uniform_(self.weight_o.weight)
         self.to(device=self.device)
 
     def generate_graph(self, dataset):
@@ -313,26 +312,39 @@ class IGCN(BasicModel):
         feat = get_sparse_tensor(feat, self.device)
         return feat, user_map, item_map
 
+    def masked_mm(self, x_q, x_k, row, column):
+        alpha = []
+        n_non_zeros = row.shape[0]
+        end_indices = list(np.arange(0, n_non_zeros, self.size_chunk, dtype=np.int64)) + [n_non_zeros]
+        for i_chunk in range(1, len(end_indices)):
+            t_q = torch.index_select(x_q, 0, row[end_indices[i_chunk - 1]:end_indices[i_chunk]])
+            t_k = torch.index_select(x_k, 0, column[end_indices[i_chunk - 1]:end_indices[i_chunk]])
+            alpha.append((t_q * t_k).sum(2))
+        alpha = torch.cat(alpha, dim=0)
+        return alpha
+
     def inductive_rep_layer(self, feat_mat):
-        embedding_q = self.weight_q(self.embedding.weight).view(-1, self.n_heads, self.embedding_size)
-        embedding_k = self.weight_q(self.embedding.weight).view(-1, self.n_heads, self.embedding_size)
-        embedding_v = self.weight_q(self.embedding.weight).view(-1, self.n_heads, self.embedding_size)
+        x = F.normalize(self.embedding.weight, p=2, dim=1)
+        x_q = self.weight_q(x).view(-1, self.n_heads, self.attention_size)
+        x_k = self.weight_k(x).view(-1, self.n_heads, self.attention_size)
+
         row, column = feat_mat.indices()
         g = dgl.graph((column, row), num_nodes=max(self.feat_mat.shape), device=self.device)
-        x_q = dgl.ops.gspmm(g, 'mul', 'sum', lhs_data=embedding_q, rhs_data=feat_mat.values())
-        x_q = torch.index_select(x_q, 0, row)
-        x_k = torch.index_select(embedding_k, 0, column)
-        alpha = (x_q * x_k).sum(2)
-        alpha = torch.stack(alpha, dim=0)
+        x_q = dgl.ops.gspmm(g, 'mul', 'sum', lhs_data=x_q, rhs_data=feat_mat.values())
+        if self.training:
+            alpha = checkpoint(self.masked_mm, x_q, x_k, row, column, preserve_rng_state=False)
+        else:
+            alpha = self.masked_mm(x_q, x_k, row, column)
+
         row_max_alpha = dgl.ops.gspmm(g, 'copy_rhs', 'max', lhs_data=None, rhs_data=alpha)
         alpha = alpha - row_max_alpha[row, :]
-        alpha = torch.exp(alpha)
+        alpha = torch.exp(alpha / np.sqrt(self.attention_size))
         row_sum_alpha = dgl.ops.gspmm(g, 'copy_rhs', 'sum', lhs_data=None, rhs_data=alpha)
         alpha = alpha / row_sum_alpha[row, :]
+        alpha = alpha.mean(-1)
 
-        out = dgl.ops.gspmm(g, 'mul', 'sum', lhs_data=embedding_v, rhs_data=alpha.unsqueeze(-1))
-        out = out[:self.feat_mat.shape[0], :, :] / torch.sqrt(self.embedding_size)
-        out = self.weight_o(out.view(-1, self.n_heads * self.embedding_size))
+        out = dgl.ops.gspmm(g, 'mul', 'sum', lhs_data=self.embedding.weight, rhs_data=alpha)
+        out = out[:self.feat_mat.shape[0], :]
         return out
 
     def get_rep(self):
@@ -340,9 +352,9 @@ class IGCN(BasicModel):
         representations = self.inductive_rep_layer(feat_mat)
         all_layer_rep = [representations]
         dropped_adj = NGCF.dropout_sp_mat(self, self.norm_adj)
+        row, column = dropped_adj.indices()
+        g = dgl.graph((column, row), num_nodes=self.feat_mat.shape[0], device=self.device)
         for _ in range(self.n_layers):
-            row, column = dropped_adj.indices()
-            g = dgl.graph((column, row), num_nodes=self.feat_mat.shape[0], device=self.device)
             representations = dgl.ops.gspmm(g, 'mul', 'sum', lhs_data=representations, rhs_data=dropped_adj.values())
             all_layer_rep.append(representations)
         all_layer_rep = torch.stack(all_layer_rep, dim=0)
@@ -371,13 +383,19 @@ class IMF(BasicModel):
     def __init__(self, model_config):
         super(IMF, self).__init__(model_config)
         self.embedding_size = model_config['embedding_size']
-        self.feature_ratio = model_config['feature_ratio']
+        self.attention_size = model_config['attention_size']
+        self.n_heads = model_config['n_heads']
         self.dropout = model_config['dropout']
+        self.feature_ratio = model_config['feature_ratio']
+        self.size_chunk = model_config.get('size_chunk', int(1e5))
         self.feat_mat, self.user_map, self.item_map = self.generate_feat(model_config['dataset'])
 
-        self.dense_layer = nn.Linear(self.feat_mat.shape[1], self.embedding_size)
-        normal_(self.dense_layer.weight, std=0.1)
-        zeros_(self.dense_layer.bias)
+        self.embedding = nn.Embedding(self.feat_mat.shape[1], self.embedding_size)
+        self.weight_q = nn.Linear(self.embedding_size, self.attention_size * self.n_heads, bias=False)
+        self.weight_k = nn.Linear(self.embedding_size, self.attention_size * self.n_heads, bias=False)
+        kaiming_uniform_(self.embedding.weight)
+        kaiming_uniform_(self.weight_q.weight)
+        kaiming_uniform_(self.weight_k.weight)
         self.to(device=self.device)
 
     def generate_feat(self, dataset, is_updating=False):
@@ -385,7 +403,7 @@ class IMF(BasicModel):
 
     def get_rep(self):
         feat_mat = NGCF.dropout_sp_mat(self, self.feat_mat)
-        representations = torch.sparse.mm(feat_mat, self.dense_layer.weight.t()) + self.dense_layer.bias[None, :]
+        representations = IGCN.inductive_rep_layer(feat_mat)
         return representations
 
     def bpr_forward(self, users, pos_items, neg_items):

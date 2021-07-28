@@ -16,8 +16,8 @@ def get_gowalla_config(device):
     gowalla_config.append((dataset_config, model_config, trainer_config))
 
     model_config = {'name': 'IGCN', 'embedding_size': 64, 'n_layers': 3, 'device': device,
-                    'dropout': 0.3, 'feature_ratio': 1., 'n_heads': 8, 'attention_size': 32}
-    trainer_config = {'name': 'BPRTrainer', 'optimizer': 'Adam', 'lr': 1.e-3, 'l2_reg': 0.,
+                    'dropout': 0.3, 'feature_ratio': 1., 'n_heads': 8}
+    trainer_config = {'name': 'IGCNTrainer', 'optimizer': 'Adam', 'lr': 1.e-3, 'l2_reg': 0.,
                       'n_epochs': 1000, 'batch_size': 2048, 'dataloader_num_workers': 6,
                       'test_batch_size': 512, 'topks': [20, 100], 'device': device}
     gowalla_config.append((dataset_config, model_config, trainer_config))
@@ -43,7 +43,7 @@ def get_gowalla_config(device):
 
     model_config = {'name': 'IMF', 'embedding_size': 64, 'device': device,
                     'feature_ratio': 1., 'dropout': 0.1}
-    trainer_config = {'name': 'BPRTrainer', 'optimizer': 'Adam', 'lr': 1.e-3, 'l2_reg': 1.e-5,
+    trainer_config = {'name': 'IGCNTrainer', 'optimizer': 'Adam', 'lr': 1.e-3, 'l2_reg': 1.e-5,
                       'device': device, 'n_epochs': 1000, 'batch_size': 2048, 'dataloader_num_workers': 6,
                       'test_batch_size': 512, 'topks': [20, 100]}
     gowalla_config.append((dataset_config, model_config, trainer_config))

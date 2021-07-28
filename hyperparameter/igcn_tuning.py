@@ -13,8 +13,8 @@ def fitness(lr, l2_reg, dropout):
     dataset_config = {'name': 'GowallaDataset', 'path': 'data/Gowalla',
                       'device': device, 'split_ratio': [0.7, 0.1, 0.2]}
     model_config = {'name': 'IGCN', 'embedding_size': 64, 'n_layers': 3, 'device': device,
-                    'dropout': dropout, 'feature_ratio': 1., 'n_heads': 8, 'attention_size': 32}
-    trainer_config = {'name': 'BPRTrainer', 'optimizer': 'Adam', 'lr': lr, 'l2_reg': l2_reg,
+                    'dropout': dropout, 'feature_ratio': 1., 'n_heads': 8}
+    trainer_config = {'name': 'IGCNTrainer', 'optimizer': 'Adam', 'lr': lr, 'l2_reg': l2_reg,
                       'device': device, 'n_epochs': 1000, 'batch_size': 2048, 'dataloader_num_workers': 6,
                       'test_batch_size': 512, 'topks': [20]}
     dataset = get_dataset(dataset_config)

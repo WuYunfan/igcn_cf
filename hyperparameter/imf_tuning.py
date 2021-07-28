@@ -14,7 +14,7 @@ def fitness(lr, l2_reg, dropout):
                       'device': device, 'split_ratio': [0.7, 0.1, 0.2]}
     model_config = {'name': 'IMF', 'embedding_size': 64, 'device': device,
                     'feature_ratio': 1., 'dropout': dropout}
-    trainer_config = {'name': 'BPRTrainer', 'optimizer': 'Adam', 'lr': lr, 'l2_reg': l2_reg,
+    trainer_config = {'name': 'IGCNTrainer', 'optimizer': 'Adam', 'lr': lr, 'l2_reg': l2_reg,
                       'device': device, 'n_epochs': 1000, 'batch_size': 2048, 'dataloader_num_workers': 6,
                       'test_batch_size': 512, 'topks': [20]}
     dataset = get_dataset(dataset_config)

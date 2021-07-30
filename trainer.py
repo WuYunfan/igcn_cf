@@ -34,9 +34,14 @@ class BasicTrainer:
         self.epoch = 0
         self.best_ndcg = -np.inf
         self.save_path = None
+        self.opt = None
 
         test_user = TensorDataset(torch.arange(self.dataset.n_users, dtype=torch.int64, device=self.device))
         self.test_user_loader = DataLoader(test_user, batch_size=trainer_config['test_batch_size'])
+
+    def initialize_optimizer(self):
+        opt = getattr(sys.modules[__name__], self.config['optimizer'])
+        self.opt = opt(self.model.parameters(), lr=self.config['lr'])
 
     def train_one_epoch(self):
         raise NotImplementedError
@@ -219,8 +224,7 @@ class BPRTrainer(BasicTrainer):
 
         self.dataloader = DataLoader(self.dataset, batch_size=trainer_config['batch_size'],
                                      num_workers=trainer_config['dataloader_num_workers'])
-        self.opt = getattr(sys.modules[__name__], trainer_config['optimizer'])
-        self.opt = self.opt(self.model.parameters(), lr=trainer_config['lr'])
+        self.initialize_optimizer()
         self.l2_reg = trainer_config['l2_reg']
 
     def train_one_epoch(self):
@@ -267,8 +271,7 @@ class BCETrainer(BasicTrainer):
 
         self.dataloader = DataLoader(self.dataset, batch_size=trainer_config['batch_size'],
                                      num_workers=trainer_config['dataloader_num_workers'])
-        self.opt = getattr(sys.modules[__name__], trainer_config['optimizer'])
-        self.opt = self.opt(self.model.parameters(), lr=trainer_config['lr'])
+        self.initialize_optimizer()
         self.l2_reg = trainer_config['l2_reg']
         self.mf_pretrain_epochs = trainer_config['mf_pretrain_epochs']
         self.mlp_pretrain_epochs = trainer_config['mlp_pretrain_epochs']
@@ -276,12 +279,12 @@ class BCETrainer(BasicTrainer):
     def train_one_epoch(self):
         if self.epoch == self.mf_pretrain_epochs:
             self.model.arch = 'mlp'
+            self.initialize_optimizer()
             self.best_ndcg = -np.inf
             self.model.load(self.save_path)
         if self.epoch == self.mf_pretrain_epochs + self.mlp_pretrain_epochs:
             self.model.arch = 'neumf'
-            self.opt = getattr(sys.modules[__name__], self.config['optimizer'])
-            self.opt = self.opt(self.model.parameters(), lr=self.config['lr'])
+            self.initialize_optimizer()
             self.best_ndcg = -np.inf
             self.model.load(self.save_path)
             self.model.init_mlp_layers()
@@ -316,8 +319,7 @@ class MLTrainer(BasicTrainer):
         self.train_user_loader = DataLoader(train_user, batch_size=trainer_config['batch_size'], shuffle=True)
         self.data_mat = sp.coo_matrix((np.ones((len(self.dataset.train_array),)), np.array(self.dataset.train_array).T),
                                       shape=(self.dataset.n_users, self.dataset.n_items), dtype=np.float32).tocsr()
-        self.opt = getattr(sys.modules[__name__], trainer_config['optimizer'])
-        self.opt = self.opt(self.model.parameters(), lr=trainer_config['lr'])
+        self.initialize_optimizer()
         self.l2_reg = trainer_config['l2_reg']
         self.kl_reg = trainer_config['kl_reg']
 

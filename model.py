@@ -137,12 +137,12 @@ class NGCF(BasicModel):
         self.bi_layers = nn.ModuleList(self.bi_layers)
         self.norm_adj = self.generate_graph(model_config['dataset'])
         for layer in self.gc_layers:
-            kaiming_uniform_(layer.weight, nonlinearity='leaky_relu')
+            kaiming_uniform_(layer.weight)
             zeros_(layer.bias)
         for layer in self.bi_layers:
-            kaiming_uniform_(layer.weight, nonlinearity='leaky_relu')
+            kaiming_uniform_(layer.weight)
             zeros_(layer.bias)
-        kaiming_uniform_(self.embedding.weight, nonlinearity='leaky_relu')
+        kaiming_uniform_(self.embedding.weight)
         self.to(device=self.device)
 
     def generate_graph(self, dataset):
@@ -262,6 +262,8 @@ class IGCN(BasicModel):
         self.embedding = nn.Embedding(self.feat_mat.shape[1], self.embedding_size)
         self.weight_q = nn.Linear(self.embedding_size, self.n_heads, bias=False)
         self.weight_k = nn.Linear(self.embedding_size, self.n_heads, bias=False)
+        self.bn_q = nn.BatchNorm1d(self.embedding_size)
+        self.bn_k = nn.BatchNorm1d(self.embedding_size)
         kaiming_uniform_(self.embedding.weight)
         kaiming_uniform_(self.weight_q.weight)
         kaiming_uniform_(self.weight_k.weight)
@@ -312,13 +314,13 @@ class IGCN(BasicModel):
         return feat, user_map, item_map
 
     def inductive_rep_layer(self, feat_mat):
-        x_k = F.normalize(self.embedding.weight, p=2, dim=1)
+        x_k = self.bn_k(self.embedding.weight)
         alpha_k = self.weight_k(x_k)
 
         row, column = feat_mat.indices()
         g = dgl.graph((column, row), num_nodes=max(self.feat_mat.shape), device=self.device)
         x_q = dgl.ops.gspmm(g, 'mul', 'sum', lhs_data=self.embedding.weight, rhs_data=feat_mat.values())
-        x_q = F.normalize(x_q, p=2, dim=1)
+        x_q = self.bn_q(x_q)
         alpha_q = self.weight_q(x_q)
 
         alpha = alpha_q.index_select(0, row) + alpha_k.index_select(0, column)
@@ -490,10 +492,10 @@ class NeuMF(BasicModel):
         self.mlp_layers = nn.ModuleList(self.mlp_layers)
         self.output_layer = nn.Linear(self.layer_sizes[-1] + self.embedding_size, 1, bias=False)
 
-        normal_(self.mf_user_embedding.weight, std=0.1)
-        normal_(self.mf_item_embedding.weight, std=0.1)
-        normal_(self.mlp_user_embedding.weight, std=0.1)
-        normal_(self.mlp_item_embedding.weight, std=0.1)
+        kaiming_uniform_(self.mf_user_embedding.weight)
+        kaiming_uniform_(self.mf_item_embedding.weight)
+        kaiming_uniform_(self.mlp_user_embedding.weight)
+        kaiming_uniform_(self.mlp_item_embedding.weight)
         self.init_mlp_layers()
         self.arch = 'gmf'
         self.to(device=self.device)
@@ -507,14 +509,11 @@ class NeuMF(BasicModel):
     def bce_forward(self, users, items):
         users_mf_e, items_mf_e = self.mf_user_embedding(users), self.mf_item_embedding(items)
         users_mlp_e, items_mlp_e = self.mlp_user_embedding(users), self.mlp_item_embedding(items)
-        l2_norm_sq = torch.norm(users_mf_e, p=2, dim=1) ** 2 + torch.norm(items_mf_e, p=2, dim=1) ** 2 \
-                     + torch.norm(users_mlp_e, p=2, dim=1) ** 2 + torch.norm(items_mlp_e, p=2, dim=1) ** 2
 
         mf_vectors = users_mf_e * items_mf_e
         mlp_vectors = torch.cat([users_mlp_e, items_mlp_e], dim=1)
         for layer in self.mlp_layers:
             mlp_vectors = F.leaky_relu(layer(mlp_vectors))
-            l2_norm_sq += torch.norm(layer.weight, p=2)[None] ** 2
 
         if self.arch == 'gmf':
             vectors = [mf_vectors, torch.zeros_like(mlp_vectors, device=self.device, dtype=torch.float32)]
@@ -523,8 +522,9 @@ class NeuMF(BasicModel):
         else:
             vectors = [mf_vectors, mlp_vectors]
         predict_vectors = torch.cat(vectors, dim=1)
-        scores = self.output_layer(predict_vectors).squeeze()
-        l2_norm_sq += torch.norm(self.output_layer.weight, p=2)[None] ** 2
+        scores = predict_vectors * self.output_layer.weight
+        l2_norm_sq = torch.norm(scores, p=2, dim=1) ** 2
+        scores = scores.sum(dim=1)
         return scores, l2_norm_sq
 
     def predict(self, users):

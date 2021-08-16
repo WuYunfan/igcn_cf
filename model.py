@@ -37,7 +37,7 @@ class BasicModel(nn.Module):
         torch.save(self.state_dict(), path)
 
     def load(self, path):
-        self.load_state_dict(torch.load(path))
+        self.load_state_dict(torch.load(path, map_location=self.device))
 
 
 class MF(BasicModel):
@@ -335,11 +335,11 @@ class IGCN(BasicModel):
 
         out = dgl.ops.gspmm(g, 'mul', 'sum', lhs_data=self.embedding.weight, rhs_data=alpha)
         out = out[:self.feat_mat.shape[0], :]
-        return out
+        return out, alpha
 
     def get_rep(self):
         feat_mat = NGCF.dropout_sp_mat(self, self.feat_mat)
-        representations = self.inductive_rep_layer(feat_mat)
+        representations, _ = self.inductive_rep_layer(feat_mat)
         all_layer_rep = [representations]
         dropped_adj = NGCF.dropout_sp_mat(self, self.norm_adj)
         row, column = dropped_adj.indices()
@@ -362,7 +362,7 @@ class IGCN(BasicModel):
         torch.save(params, path)
 
     def load(self, path):
-        params = torch.load(path)
+        params = torch.load(path, map_location=self.device)
         self.load_state_dict(params['sate_dict'])
         self.user_map = params['user_map']
         self.item_map = params['item_map']
@@ -391,7 +391,7 @@ class IMF(BasicModel):
 
     def get_rep(self):
         feat_mat = NGCF.dropout_sp_mat(self, self.feat_mat)
-        representations = IGCN.inductive_rep_layer(feat_mat)
+        representations, _ = IGCN.inductive_rep_layer(feat_mat)
         return representations
 
     def bpr_forward(self, users, pos_items, neg_items):

@@ -1,6 +1,6 @@
 def get_gowalla_config(device):
     dataset_config = {'name': 'GowallaDataset', 'path': 'data/Gowalla',
-                      'device': device, 'split_ratio': [0.7, 0.1, 0.2]}
+                      'device': device, 'split_ratio': [0.7, 0.1, 0.2], 'min_inter': 10}
     gowalla_config = []
 
     model_config = {'name': 'MF', 'embedding_size': 64, 'device': device}

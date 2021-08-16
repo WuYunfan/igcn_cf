@@ -4,7 +4,7 @@ from trainer import get_trainer
 import torch
 from utils import init_run
 from tensorboardX import SummaryWriter
-from config import get_ml1m_config, get_gowalla_config, get_yelp_config
+from config import get_gowalla_config
 
 
 def main():

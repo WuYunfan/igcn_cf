@@ -11,7 +11,7 @@ def fitness(lr, l2_reg):
     set_seed(2021)
     device = torch.device('cuda')
     dataset_config = {'name': 'GowallaDataset', 'path': 'data/Gowalla',
-                      'device': device, 'split_ratio': [0.7, 0.1, 0.2]}
+                      'device': device, 'split_ratio': [0.7, 0.1, 0.2], 'min_inter': 10}
     model_config = {'name': 'NeuMF', 'embedding_size': 64, 'device': device, 'layer_sizes': [64, 64, 64]}
     trainer_config = {'name': 'BCETrainer', 'optimizer': 'Adam', 'lr': lr, 'l2_reg': l2_reg,
                       'device': device, 'n_epochs': 1000, 'batch_size': 2048, 'dataloader_num_workers': 6,

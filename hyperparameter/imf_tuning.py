@@ -11,7 +11,7 @@ def fitness(lr, l2_reg, dropout):
     set_seed(2021)
     device = torch.device('cuda')
     dataset_config = {'name': 'GowallaDataset', 'path': 'data/Gowalla',
-                      'device': device, 'split_ratio': [0.7, 0.1, 0.2]}
+                      'device': device, 'split_ratio': [0.7, 0.1, 0.2], 'min_inter': 10}
     model_config = {'name': 'IMF', 'embedding_size': 64, 'device': device,
                     'feature_ratio': 1., 'dropout': dropout, 'n_heads': 8}
     trainer_config = {'name': 'IGCNTrainer', 'optimizer': 'Adam', 'lr': lr, 'l2_reg': l2_reg,

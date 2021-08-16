@@ -11,7 +11,7 @@ def fitness(k):
     set_seed(2021)
     device = torch.device('cuda')
     dataset_config = {'name': 'GowallaDataset', 'path': 'data/Gowalla',
-                      'device': device, 'split_ratio': [0.7, 0.1, 0.2]}
+                      'device': device, 'split_ratio': [0.7, 0.1, 0.2], 'min_inter': 10}
     model_config = {'name': 'ItemKNN', 'k': k, 'device': device}
     trainer_config = {'name': 'BasicTrainer',  'device': device, 'n_epochs': 0,
                       'test_batch_size': 512, 'topks': [20]}

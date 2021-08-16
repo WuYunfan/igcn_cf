@@ -257,7 +257,8 @@ class IGCN(BasicModel):
         self.beta = model_config.get('beta', 0.9)
         self.feature_ratio = model_config['feature_ratio']
         self.norm_adj = self.generate_graph(model_config['dataset'])
-        self.feat_mat, self.user_map, self.item_map = self.generate_feat(model_config['dataset'])
+        self.feat_mat, self.user_map, self.item_map = \
+            self.generate_feat(model_config['dataset'], core_ranking=model_config.get('core_ranking', None))
 
         self.embedding = nn.Embedding(self.feat_mat.shape[1], self.embedding_size)
         self.weight_q = nn.Linear(self.embedding_size, self.n_heads, bias=False)
@@ -272,21 +273,27 @@ class IGCN(BasicModel):
     def generate_graph(self, dataset):
         return LightGCN.generate_graph(self, dataset)
 
-    def generate_feat(self, dataset, is_updating=False):
+    def generate_feat(self, dataset, is_updating=False, core_ranking=None):
         if not is_updating:
-            sub_mat = sp.coo_matrix((np.ones((len(dataset.train_array),)), np.array(dataset.train_array).T),
-                                    shape=(self.n_users, self.n_items), dtype=np.float32)
-            user_degree = np.array(np.sum(sub_mat, axis=1)).squeeze()
-            popular_users = np.argsort(user_degree)[-int(self.n_users * self.feature_ratio):]
-            print('User degree ratio {:.3f}%'.format(np.sum(user_degree[popular_users]) * 100. / np.sum(user_degree)))
+            if core_ranking:
+                core_ranking = np.load(core_ranking)
+                ranked_users = core_ranking['ranked_users']
+                ranked_items = core_ranking['ranked_items']
+            else:
+                sub_mat = sp.coo_matrix((np.ones((len(dataset.train_array),)), np.array(dataset.train_array).T),
+                                        shape=(self.n_users, self.n_items), dtype=np.float32)
+                user_degree = np.array(np.sum(sub_mat, axis=1)).squeeze()
+                item_degree = np.array(np.sum(sub_mat, axis=0)).squeeze()
+                ranked_users = np.argsort(user_degree)[::-1].copy()
+                ranked_items = np.argsort(item_degree)[::-1].copy()
+
+            core_users = ranked_users[:int(self.n_users * self.feature_ratio)]
+            core_items = ranked_items[:int(self.n_items * self.feature_ratio)]
             user_map = dict()
-            for idx, user in enumerate(popular_users):
+            for idx, user in enumerate(core_users):
                 user_map[user] = idx
-            item_degree = np.array(np.sum(sub_mat, axis=0)).squeeze()
-            popular_items = np.argsort(item_degree)[-int(self.n_items * self.feature_ratio):]
-            print('Item degree ratio {:.3f}%'.format(np.sum(item_degree[popular_items]) * 100. / np.sum(item_degree)))
             item_map = dict()
-            for idx, item in enumerate(popular_items):
+            for idx, item in enumerate(core_items):
                 item_map[item] = idx
         else:
             user_map = self.user_map
@@ -391,7 +398,7 @@ class IMF(BasicModel):
 
     def get_rep(self):
         feat_mat = NGCF.dropout_sp_mat(self, self.feat_mat)
-        representations, _ = IGCN.inductive_rep_layer(feat_mat)
+        representations, _ = IGCN.inductive_rep_layer(self, feat_mat)
         return representations
 
     def bpr_forward(self, users, pos_items, neg_items):

@@ -37,7 +37,7 @@ def get_gowalla_config(device):
     model_config = {'name': 'MultiVAE', 'layer_sizes': [64, 32],
                     'device': device, 'dropout': 0.7}
     trainer_config = {'name': 'MLTrainer', 'optimizer': 'Adam', 'lr': 1.e-2, 'l2_reg': 1.e-4, 'kl_reg': 0.2,
-                      'device': device, 'n_epochs': 1000, 'batch_size': 2048, 'dataloader_num_workers': 6,
+                      'device': device, 'n_epochs': 2000, 'batch_size': 2048, 'dataloader_num_workers': 6,
                       'test_batch_size': 512, 'topks': [20, 100]}
     gowalla_config.append((dataset_config, model_config, trainer_config))
 

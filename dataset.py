@@ -22,6 +22,7 @@ class BasicDataset(Dataset):
         self.split_ratio = dataset_config.get('split_ratio')
         self.device = dataset_config['device']
         self.negative_sample_ratio = dataset_config.get('neg_ratio', 1)
+        self.shuffle = dataset_config.get('shuffle', False)
         self.n_users = 0
         self.n_items = 0
         self.train_data = None
@@ -65,6 +66,8 @@ class BasicDataset(Dataset):
         self.train_array = []
         average_inters = []
         for user in range(self.n_users):
+            if self.shuffle:
+                np.random.shuffle(user_inter_lists[user])
             n_inter_items = len(user_inter_lists[user])
             average_inters.append(n_inter_items)
             n_train_items = int(n_inter_items * self.split_ratio[0])
@@ -135,3 +138,22 @@ class GowallaDataset(BasicDataset):
             user_inter_lists[user].sort(key=lambda entry: entry[1])
             user_inter_lists[user] = [i_t[0] for i_t in user_inter_lists[user]]
         self.generate_data(user_inter_lists)
+
+
+class AuxiliaryDataset(BasicDataset):
+    def __init__(self, dataset, user_map, item_map):
+        self.n_users = len(user_map)
+        self.n_items = len(item_map)
+        self.device = dataset.device
+        self.negative_sample_ratio = 1
+        self.train_data = [[] for _ in range(self.n_users)]
+        self.length = len(dataset)
+        for o_user in range(dataset.n_users):
+            if o_user in user_map:
+                for o_item in dataset.train_data[o_user]:
+                    if o_item in item_map:
+                        self.train_data[user_map[o_user]].append(item_map[o_item])
+
+    def __len__(self):
+        return self.length
+

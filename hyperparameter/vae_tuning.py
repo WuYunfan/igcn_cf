@@ -15,7 +15,7 @@ def fitness(lr, l2_reg, dropout):
     model_config = {'name': 'MultiVAE', 'layer_sizes': [64, 32],
                     'device': device, 'dropout': dropout}
     trainer_config = {'name': 'MLTrainer', 'optimizer': 'Adam', 'lr': lr, 'l2_reg': l2_reg, 'kl_reg': 0.2,
-                      'device': device, 'n_epochs': 2000, 'batch_size': 2048, 'dataloader_num_workers': 6,
+                      'device': device, 'n_epochs': 1000, 'batch_size': 512, 'dataloader_num_workers': 6,
                       'test_batch_size': 512, 'topks': [20]}
     dataset = get_dataset(dataset_config)
     model = get_model(model_config, dataset)
@@ -26,7 +26,7 @@ def fitness(lr, l2_reg, dropout):
 def main():
     log_path = __file__[:-3]
     init_run(log_path, 2021)
-    param_grid = {'lr': [1.e-3, 1.e-2], 'l2_reg': [1.e-5, 1.e-4, 1.e-3, 1.e-2], 'dropout': [0.3, 0.5, 0.7]}
+    param_grid = {'lr': [1.e-3, 1.e-2], 'l2_reg': [1.e-5, 1.e-4, 1.e-3], 'dropout': [0.3, 0.5, 0.7]}
     grid = ParameterGrid(param_grid)
     max_ndcg = -np.inf
     best_params = None

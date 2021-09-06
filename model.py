@@ -259,15 +259,23 @@ class IGCN(BasicModel):
         self.n_layers = model_config['n_layers']
         self.dropout = model_config['dropout']
         self.feature_ratio = model_config['feature_ratio']
-        self.norm_adj = self.generate_graph(model_config['dataset'])
-        self.feat_mat, self.user_map, self.item_map, self.row_sum, self.column_sum = \
-            self.generate_feat(model_config['dataset'], core_ranking=model_config.get('core_ranking', None))
         self.alpha = 1.
+        self.delta = model_config.get('delta', 0.99)
+        self.norm_adj = self.generate_graph(model_config['dataset'])
+        self.feat_mat, self.user_map, self.item_map, self.row_sum = \
+            self.generate_feat(model_config['dataset'], core_ranking=model_config.get('core_ranking', None))
         self.feat_mat_anneal()
 
         self.embedding = nn.Embedding(self.feat_mat.shape[1], self.embedding_size)
-        kaiming_uniform_(self.embedding.weight)
+        normal_(self.embedding.weight, std=0.1)
         self.to(device=self.device)
+
+    def feat_mat_anneal(self):
+        row, column = self.feat_mat.indices()
+        edge_values = torch.pow(self.row_sum[row], (self.alpha - 1.) / 2. - 0.5)
+
+        self.feat_mat = torch.sparse.FloatTensor(self.feat_mat.indices(), edge_values, self.feat_mat.shape).coalesce()
+        self.alpha *= self.delta
 
     def generate_graph(self, dataset):
         return LightGCN.generate_graph(self, dataset)
@@ -312,9 +320,8 @@ class IGCN(BasicModel):
         feat = sp.coo_matrix((np.ones((len(indices),)), np.array(indices).T),
                              shape=(self.n_users + self.n_items, user_dim + item_dim + 2), dtype=np.float32).tocsr()
         row_sum = torch.tensor(np.array(np.sum(feat, axis=1)).squeeze(), dtype=torch.float32, device=self.device)
-        column_sum = torch.tensor(np.array(np.sum(feat, axis=0)).squeeze(), dtype=torch.float32, device=self.device)
         feat = get_sparse_tensor(feat, self.device)
-        return feat, user_map, item_map, row_sum, column_sum
+        return feat, user_map, item_map, row_sum
 
     def inductive_rep_layer(self, feat_mat):
         padding_tensor = torch.empty([max(self.feat_mat.shape) - self.feat_mat.shape[1], self.embedding_size],
@@ -324,14 +331,8 @@ class IGCN(BasicModel):
         row, column = feat_mat.indices()
         g = dgl.graph((column, row), num_nodes=max(self.feat_mat.shape), device=self.device)
         x = dgl.ops.gspmm(g, 'mul', 'sum', lhs_data=padding_features, rhs_data=feat_mat.values())
-        return x[:self.feat_mat.shape[0], :]
-
-    def feat_mat_anneal(self):
-        row, column = self.feat_mat.indices()
-        edge_values = torch.pow(self.row_sum[row], self.alpha - 1.) * torch.pow(self.column_sum[column], -self.alpha)
-
-        self.feat_mat = torch.sparse.FloatTensor(self.feat_mat.indices(), edge_values, self.feat_mat.shape).coalesce()
-        self.alpha *= 0.99
+        x = x[:self.feat_mat.shape[0], :]
+        return x
 
     def get_rep(self):
         feat_mat = NGCF.dropout_sp_mat(self, self.feat_mat)
@@ -365,7 +366,7 @@ class IGCN(BasicModel):
         self.user_map = params['user_map']
         self.item_map = params['item_map']
         self.alpha = params['alpha']
-        self.feat_mat, _, _, self.row_sum, self.column_sum = self.generate_feat(self.config['dataset'], is_updating=True)
+        self.feat_mat, _, _, self.row_sum = self.generate_feat(self.config['dataset'], is_updating=True)
         self.feat_mat_anneal()
 
 
@@ -377,16 +378,16 @@ class AttIGCN(IGCN):
         self.n_heads = 4
         self.dropout = model_config['dropout']
         self.feature_ratio = 1.
+        self.alpha = 0.
         self.size_chunk = int(1e5)
         self.norm_adj = self.generate_graph(model_config['dataset'])
-        self.feat_mat, self.user_map, self.item_map, _, _ = self.generate_feat(model_config['dataset'])
+        self.feat_mat, self.user_map, self.item_map, self.row_sum = self.generate_feat(model_config['dataset'])
+        self.feat_mat_anneal()
 
         self.embedding = nn.Embedding(self.feat_mat.shape[1], self.embedding_size)
         kaiming_uniform_(self.embedding.weight)
         self.weight_q = init_one_layer(self.embedding_size, self.embedding_size * self.n_heads)
         self.weight_k = init_one_layer(self.embedding_size, self.embedding_size * self.n_heads)
-        self.bn_q = nn.BatchNorm1d(self.embedding_size, momentum=0.01)
-        self.bn_k = nn.BatchNorm1d(self.embedding_size, momentum=0.01)
         self.to(device=self.device)
 
     def masked_mm(self, x_q, x_k, row, column):
@@ -402,13 +403,11 @@ class AttIGCN(IGCN):
 
     def inductive_rep_layer(self, feat_mat, return_alpha=False):
         x_k = self.embedding.weight.detach()
-        x_k = self.bn_k(x_k)
         x_k = self.weight_k(x_k).view(-1, self.n_heads, self.embedding_size)
 
         row, column = feat_mat.indices()
         g = dgl.graph((column, row), num_nodes=self.feat_mat.shape[1], device=self.device)
         x_q = dgl.ops.gspmm(g, 'mul', 'sum', lhs_data=self.embedding.weight.detach(), rhs_data=feat_mat.values())
-        x_q = self.bn_q(x_q)
         x_q = self.weight_q(x_q).view(-1, self.n_heads, self.embedding_size)
         if self.training:
             alpha = checkpoint(self.masked_mm, x_q, x_k, row, column, preserve_rng_state=False)
@@ -437,8 +436,6 @@ class AttIGCN(IGCN):
 class IMF(IGCN):
     def __init__(self, model_config):
         super(IMF, self).__init__(model_config)
-        self.alpha = 0.
-        self.feat_mat_anneal()
 
     def get_rep(self):
         feat_mat = NGCF.dropout_sp_mat(self, self.feat_mat)
@@ -503,9 +500,6 @@ class MultiVAE(BasicModel):
 
     def predict(self, users):
         scores, _, _ = self.ml_forward(users)
-        if scores.shape[1] < self.n_items:
-            padding = torch.full([scores.shape[0], self.n_items - scores.shape[1]], -np.inf, device=self.device)
-            scores = torch.cat([scores, padding], dim=1)
         return scores
 
 

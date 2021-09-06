@@ -8,6 +8,7 @@ import os
 from utils import AverageMeter, get_sparse_tensor
 import torch.nn.functional as F
 import scipy.sparse as sp
+from dataset import AuxiliaryDataset
 
 
 def get_trainer(config, dataset, model):
@@ -253,16 +254,39 @@ class IGCNTrainer(BasicTrainer):
 
         self.dataloader = DataLoader(self.dataset, batch_size=trainer_config['batch_size'],
                                      num_workers=trainer_config['dataloader_num_workers'])
-        opt = getattr(sys.modules[__name__], trainer_config['optimizer'])
-        self.opt = opt([self.model.embedding.weight], lr=trainer_config['lr'])
-        self.opt_w = opt([self.model.weight_q.weight, self.model.weight_k.weight], lr=trainer_config['lr'])
+        self.aux_dataloader = DataLoader(AuxiliaryDataset(self.dataset, self.model.user_map, self.model.item_map),
+                                         batch_size=trainer_config['batch_size'],
+                                         num_workers=trainer_config['dataloader_num_workers'])
+        self.initialize_optimizer()
         self.l2_reg = trainer_config['l2_reg']
+        self.aux_reg = trainer_config['aux_reg']
 
     def train_one_epoch(self):
-        self.opt_w.zero_grad()
-        loss = BPRTrainer.train_one_epoch(self)
-        self.opt_w.step()
-        return loss
+        losses = AverageMeter()
+        for batch_data, a_batch_data in zip(self.dataloader, self.aux_dataloader):
+            inputs = batch_data[:, 0, :].to(device=self.device, dtype=torch.int64)
+            users, pos_items, neg_items = inputs[:, 0],  inputs[:, 1],  inputs[:, 2]
+            users_r, pos_items_r, neg_items_r, l2_norm_sq = self.model.bpr_forward(users, pos_items, neg_items)
+            pos_scores = torch.sum(users_r * pos_items_r, dim=1)
+            neg_scores = torch.sum(users_r * neg_items_r, dim=1)
+            bpr_loss = F.softplus(neg_scores - pos_scores).mean()
+
+            inputs = a_batch_data[:, 0, :].to(device=self.device, dtype=torch.int64)
+            users, pos_items, neg_items = inputs[:, 0],  inputs[:, 1],  inputs[:, 2]
+            users_r = self.model.embedding(users)
+            pos_items_r = self.model.embedding(pos_items + len(self.model.user_map))
+            neg_items_r = self.model.embedding(neg_items + len(self.model.user_map))
+            pos_scores = torch.sum(users_r * pos_items_r, dim=1)
+            neg_scores = torch.sum(users_r * neg_items_r, dim=1)
+            aux_loss = F.softplus(neg_scores - pos_scores).mean()
+
+            reg_loss = self.l2_reg * l2_norm_sq.mean() + self.aux_reg * aux_loss
+            loss = bpr_loss + reg_loss
+            self.opt.zero_grad()
+            loss.backward()
+            self.opt.step()
+            losses.update(loss.item(), inputs.shape[0])
+        return losses.avg
 
 
 class BCETrainer(BasicTrainer):

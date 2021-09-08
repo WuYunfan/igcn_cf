@@ -10,8 +10,8 @@ from trainer import get_trainer
 def fitness(lr, l2_reg, dropout):
     set_seed(2021)
     device = torch.device('cuda')
-    dataset_config = {'name': 'GowallaDataset', 'path': 'data/Gowalla',
-                      'device': device, 'split_ratio': [0.7, 0.1, 0.2], 'min_inter': 10}
+    dataset_config = {'name': 'ProcessedDataset', 'path': 'data/Gowalla/time',
+                      'device': device}
     model_config = {'name': 'NGCF', 'embedding_size': 64, 'layer_sizes': [64, 64, 64],
                     'device': device, 'dropout': dropout}
     trainer_config = {'name': 'BPRTrainer', 'optimizer': 'Adam', 'lr': lr, 'l2_reg': l2_reg,

@@ -10,8 +10,8 @@ from trainer import get_trainer
 def fitness(lr, l2_reg, dropout, aux_reg):
     set_seed(2021)
     device = torch.device('cuda')
-    dataset_config = {'name': 'GowallaDataset', 'path': 'data/Gowalla',
-                      'device': device, 'split_ratio': [0.7, 0.1, 0.2], 'min_inter': 10}
+    dataset_config = {'name': 'ProcessedDataset', 'path': 'data/Gowalla/time',
+                      'device': device}
     model_config = {'name': 'IGCN', 'embedding_size': 64, 'n_layers': 3, 'device': device,
                     'dropout': dropout, 'feature_ratio': 1.}
     trainer_config = {'name': 'IGCNTrainer', 'optimizer': 'Adam', 'lr': lr, 'l2_reg': l2_reg, 'aux_reg': aux_reg,
@@ -26,7 +26,7 @@ def fitness(lr, l2_reg, dropout, aux_reg):
 def main():
     log_path = __file__[:-3]
     init_run(log_path, 2021)
-    param_grid = {'lr': [1.e-3], 'l2_reg': [0., 1.e-5, 1.e-4], 'dropout': [0.3, 0.5, 0.7],
+    param_grid = {'lr': [1.e-3], 'l2_reg': [0., 1.e-5, 1.e-4], 'dropout': [0., 0.1, 0.3],
                   'aux_reg': [1.e-3, 1.e-2, 1.e-1]}
     grid = ParameterGrid(param_grid)
     max_ndcg = -np.inf

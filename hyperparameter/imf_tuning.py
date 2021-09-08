@@ -10,9 +10,9 @@ from trainer import get_trainer
 def fitness(lr, l2_reg, dropout, aux_reg):
     set_seed(2021)
     device = torch.device('cuda')
-    dataset_config = {'name': 'GowallaDataset', 'path': 'data/Gowalla',
-                      'device': device, 'split_ratio': [0.7, 0.1, 0.2], 'min_inter': 10}
-    model_config = {'name': 'IMF', 'embedding_size': 64, 'device': device,
+    dataset_config = {'name': 'ProcessedDataset', 'path': 'data/Gowalla/time',
+                      'device': device}
+    model_config = {'name': 'IMF', 'embedding_size': 64, 'n_layers': 0, 'device': device,
                     'dropout': dropout, 'feature_ratio': 1.}
     trainer_config = {'name': 'IGCNTrainer', 'optimizer': 'Adam', 'lr': lr, 'l2_reg': l2_reg, 'aux_reg': aux_reg,
                       'device': device, 'n_epochs': 1000, 'batch_size': 2048, 'dataloader_num_workers': 6,

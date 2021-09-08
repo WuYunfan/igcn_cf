@@ -34,19 +34,6 @@ def get_sparse_tensor(mat, device):
     return sp_tensor
 
 
-def output_dataset(dataset, path):
-    if not os.path.exists(path): os.mkdir(path)
-    f = open(os.path.join(path, 'train.txt'), 'w')
-    for user in range(dataset.n_users):
-        items = [str(user)] + [str(item) for item in dataset.train_data[user]]
-        f.write(' '.join(items) + '\n')
-
-    f = open(os.path.join(path, 'test.txt'), 'w')
-    for user in range(dataset.n_users):
-        items = [str(user)] + [str(item) for item in dataset.test_data[user]]
-        f.write(' '.join(items) + '\n')
-
-
 class AverageMeter:
     def __init__(self):
         self.avg = 0.

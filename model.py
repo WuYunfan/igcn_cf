@@ -264,18 +264,20 @@ class IGCN(BasicModel):
         self.norm_adj = self.generate_graph(model_config['dataset'])
         self.feat_mat, self.user_map, self.item_map, self.row_sum = \
             self.generate_feat(model_config['dataset'], core_ranking=model_config.get('core_ranking', None))
-        self.feat_mat_anneal()
+        self.update_feat_mat()
 
         self.embedding = nn.Embedding(self.feat_mat.shape[1], self.embedding_size)
         normal_(self.embedding.weight, std=0.1)
         self.to(device=self.device)
 
-    def feat_mat_anneal(self):
+    def update_feat_mat(self):
         row, column = self.feat_mat.indices()
         edge_values = torch.pow(self.row_sum[row], (self.alpha - 1.) / 2. - 0.5)
-
         self.feat_mat = torch.sparse.FloatTensor(self.feat_mat.indices(), edge_values, self.feat_mat.shape).coalesce()
+
+    def feat_mat_anneal(self):
         self.alpha *= self.delta
+        self.update_feat_mat()
 
     def generate_graph(self, dataset):
         return LightGCN.generate_graph(self, dataset)
@@ -339,11 +341,10 @@ class IGCN(BasicModel):
         representations = self.inductive_rep_layer(feat_mat)
 
         all_layer_rep = [representations]
-        dropped_adj = NGCF.dropout_sp_mat(self, self.norm_adj)
-        row, column = dropped_adj.indices()
-        g = dgl.graph((column, row), num_nodes=dropped_adj.shape[0], device=self.device)
+        row, column = self.norm_adj.indices()
+        g = dgl.graph((column, row), num_nodes=self.norm_adj.shape[0], device=self.device)
         for _ in range(self.n_layers):
-            representations = dgl.ops.gspmm(g, 'mul', 'sum', lhs_data=representations, rhs_data=dropped_adj.values())
+            representations = dgl.ops.gspmm(g, 'mul', 'sum', lhs_data=representations, rhs_data=self.norm_adj.values())
             all_layer_rep.append(representations)
         all_layer_rep = torch.stack(all_layer_rep, dim=0)
         final_rep = all_layer_rep.mean(dim=0)
@@ -367,7 +368,7 @@ class IGCN(BasicModel):
         self.item_map = params['item_map']
         self.alpha = params['alpha']
         self.feat_mat, _, _, self.row_sum = self.generate_feat(self.config['dataset'], is_updating=True)
-        self.feat_mat_anneal()
+        self.update_feat_mat()
 
 
 class AttIGCN(IGCN):

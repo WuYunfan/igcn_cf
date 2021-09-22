@@ -7,14 +7,14 @@ from model import get_model
 from trainer import get_trainer
 
 
-def fitness(lr, l2_reg, dropout, aux_reg):
+def fitness(lr, l2_reg, dropout):
     set_seed(2021)
     device = torch.device('cuda')
     dataset_config = {'name': 'ProcessedDataset', 'path': 'data/Gowalla/time',
                       'device': device}
-    model_config = {'name': 'IMF', 'embedding_size': 64, 'n_layers': 0, 'device': device,
-                    'dropout': dropout, 'feature_ratio': 1.}
-    trainer_config = {'name': 'IGCNTrainer', 'optimizer': 'Adam', 'lr': lr, 'l2_reg': l2_reg, 'aux_reg': aux_reg,
+    model_config = {'name': 'IMCGAE', 'embedding_size': 64, 'n_layers': 3, 'device': device,
+                    'dropout': dropout}
+    trainer_config = {'name': 'BPRTrainer', 'optimizer': 'Adam', 'lr': lr, 'l2_reg': l2_reg,
                       'device': device, 'n_epochs': 1000, 'batch_size': 2048, 'dataloader_num_workers': 6,
                       'test_batch_size': 512, 'topks': [20]}
     dataset = get_dataset(dataset_config)
@@ -26,13 +26,12 @@ def fitness(lr, l2_reg, dropout, aux_reg):
 def main():
     log_path = __file__[:-3]
     init_run(log_path, 2021)
-    param_grid = {'lr': [1.e-3], 'l2_reg': [1.e-5, 1.e-4, 1.e-3], 'dropout': [0.1, 0.3, 0.5],
-                  'aux_reg': [1.e-3, 1.e-2, 1.e-1]}
+    param_grid = {'lr': [1.e-3], 'l2_reg': [0., 1.e-5, 1.e-4], 'dropout': [0.3, 0.5, 0.7]}
     grid = ParameterGrid(param_grid)
     max_ndcg = -np.inf
     best_params = None
     for params in grid:
-        ndcg = fitness(params['lr'], params['l2_reg'], params['dropout'], params['aux_reg'])
+        ndcg = fitness(params['lr'], params['l2_reg'], params['dropout'])
         print('NDCG: {:.3f}, Parameters: {:s}'.format(ndcg, str(params)))
         if ndcg > max_ndcg:
             max_ndcg = ndcg

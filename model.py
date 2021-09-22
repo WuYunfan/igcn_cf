@@ -271,7 +271,7 @@ class IGCN(BasicModel):
         self.to(device=self.device)
 
     def update_feat_mat(self):
-        row, column = self.feat_mat.indices()
+        row, _ = self.feat_mat.indices()
         edge_values = torch.pow(self.row_sum[row], (self.alpha - 1.) / 2. - 0.5)
         self.feat_mat = torch.sparse.FloatTensor(self.feat_mat.indices(), edge_values, self.feat_mat.shape).coalesce()
 
@@ -442,6 +442,52 @@ class IMF(IGCN):
         feat_mat = NGCF.dropout_sp_mat(self, self.feat_mat)
         representations = IGCN.inductive_rep_layer(self, feat_mat)
         return representations
+
+
+class IMCGAE(BasicModel):
+    def __init__(self, model_config):
+        super(IMCGAE, self).__init__(model_config)
+        self.embedding_size = model_config['embedding_size']
+        self.n_layers = model_config['n_layers']
+        self.dropout = model_config['dropout']
+        self.embedding = nn.Embedding(self.n_users + self.n_items + 3, self.embedding_size)
+        self.norm_adj = self.generate_graph(model_config['dataset'])
+        normal_(self.embedding.weight, std=0.1)
+        self.to(device=self.device)
+
+    def generate_graph(self, dataset):
+        return LightGCN.generate_graph(self, dataset)
+
+    def get_rep(self):
+        personal_user_embedding = self.embedding.data[:self.n_users, :]
+        personal_item_embedding = self.embedding.data[self.n_users:self.n_users + self.n_items, :]
+        identical_embedding = self.embedding.data[self.n_users + self.n_items, :]
+        general_user_embedding = self.embedding.data[self.n_users + self.n_items + 1, :]
+        general_item_embedding = self.embedding.data[self.n_users + self.n_items + 2, :]
+        u_representations = torch.cat([personal_user_embedding, general_user_embedding[None, :],
+                                       identical_embedding[None, :]], dim=1)
+        i_representations = torch.cat([personal_item_embedding, general_item_embedding[None, :],
+                                       identical_embedding[None, :]], dim=1)
+
+        representations = torch.cat([u_representations, i_representations], dim=0)
+        all_layer_rep = [representations]
+        row, column = self.norm_adj.indices()
+        g = dgl.graph((column, row), num_nodes=self.norm_adj.shape[0], device=self.device)
+        for i in range(self.n_layers):
+            node_dropout_masks = torch.ones(self.n_users + self.n_items, dtype=torch.float32, device=self.device)
+            node_dropout_masks = F.dropout(node_dropout_masks, p=self.dropout - 0.1 * i, training=self.training)
+            representations = representations * node_dropout_masks[:, None]
+            representations = dgl.ops.gspmm(g, 'mul', 'sum', lhs_data=representations, rhs_data=self.norm_adj.values())
+            all_layer_rep.append(representations)
+        all_layer_rep = torch.stack(all_layer_rep, dim=0)
+        final_rep = all_layer_rep.mean(dim=0)
+        return final_rep
+
+    def bpr_forward(self, users, pos_items, neg_items):
+        return NGCF.bpr_forward(self, users, pos_items, neg_items)
+
+    def predict(self, users):
+        return LightGCN.predict(self, users)
 
 
 class MultiVAE(BasicModel):

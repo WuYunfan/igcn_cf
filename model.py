@@ -482,9 +482,9 @@ class IMCGAE(BasicModel):
             node_dropout_masks = F.dropout(node_dropout_masks, p=self.dropout - 0.1 * i, training=self.training)
             representations = representations * node_dropout_masks[:, None]
             representations = dgl.ops.gspmm(g, 'mul', 'sum', lhs_data=representations, rhs_data=self.norm_adj.values())
-            all_layer_rep.append(representations)
+            all_layer_rep.append(representations / float(i + 2))
         all_layer_rep = torch.stack(all_layer_rep, dim=0)
-        final_rep = all_layer_rep.mean(dim=0)
+        final_rep = all_layer_rep.sum(dim=0)
         return final_rep
 
     def bpr_forward(self, users, pos_items, neg_items):
@@ -492,123 +492,6 @@ class IMCGAE(BasicModel):
 
     def predict(self, users):
         return LightGCN.predict(self, users)
-
-
-class IGMC(BasicModel):
-    def __init__(self, model_config):
-        super(IGMC, self).__init__(model_config)
-        self.h_hop = model_config['h_hop']
-        self.layer_sizes = model_config['layer_sizes'].copy()
-        self.layer_sizes.insert(0, 4)
-        self.dropout = model_config['dropout']
-        self.adj_mat = self.generate_graph(model_config['dataset'])
-        self.neighbors = self.generate_neighbors()
-        self.layers = []
-        for layer_idx in range(1, len(self.layer_sizes)):
-            conv = dgl.nn.GraphConv(self.layer_sizes[layer_idx - 1], self.layer_sizes[layer_idx],
-                                    norm='both', allow_zero_in_degree=True)
-            self.layers.append(conv)
-        self.layers = nn.ModuleList(self.layers)
-        self.lin1 = init_one_layer(sum(self.layer_sizes[1:]) * 2, self.layer_sizes[-1])
-        self.lin2 = init_one_layer(self.layer_sizes[-1], 1)
-        self.to(device=self.device)
-
-    def generate_graph(self, dataset):
-        sub_mat = sp.coo_matrix((np.ones((len(dataset.train_array),)), np.array(dataset.train_array).T),
-                                shape=(self.n_users, self.n_items), dtype=np.float32)
-        adj_mat = sp.lil_matrix((self.n_users + self.n_items, self.n_users + self.n_items), dtype=np.float32)
-        adj_mat[:self.n_users, self.n_users:] = sub_mat
-        adj_mat[self.n_users:, :self.n_users] = sub_mat.T
-        return adj_mat.tocsr()
-
-    def generate_neighbors(self):
-        neighbors = []
-        for node in range(self.adj_mat.shape[0]):
-            nei = np.nonzero(self.adj_mat[node, :])[1].tolist()
-            tmp = [[node] + nei, [0] + [1] * len(nei)]
-            neighbors.append(tmp)
-        return neighbors
-
-    @staticmethod
-    def subgraph_extraction_labeling(index, adj_mat, u_nei, i_nei):
-        user, item = u_nei[0], i_nei[0]
-        pos = False
-        if user in i_nei[0]:
-            i = i_nei[0].index(user)
-            i_nei = [i_nei[0][:i] + i_nei[0][i+1:], i_nei[1][:i] + i_nei[1][i+1:]]
-            i = u_nei[0].index(item)
-            u_nei = [u_nei[0][:i] + u_nei[0][i+1:], u_nei[1][:i] + u_nei[1][i+1:]]
-            pos = True
-        nodes = u_nei[0] + i_nei[0]
-        labels = u_nei[1] + [x + 2 for x in i_nei[1]]
-
-        graph = adj_mat[nodes, :][:, nodes]
-        if pos:
-            graph[0, len(u_nei[0])] = 0.
-        r, c, _ = sp.find(graph)
-        return index, r, c, one_hot(np.array(labels), 4)
-
-    def forward(self, users, items):
-        pool = mp.Pool(4)
-        results = pool.starmap_async(self.subgraph_extraction_labeling,
-                                     [(i, self.adj_mat, self.neighbors[user], self.neighbors[self.n_users + item])
-                                      for i, (user, item) in enumerate(zip(users, items))])
-        pool.close()
-        pool.join()
-        results = results.get()
-
-        ordered = [None for _ in range(users.shape[0])]
-        for index, r, c, labels in results:
-            ordered[index] = [r, c, labels]
-
-        row, column, feats = [], [], []
-        num_nodes = 0
-        for r, c, labels in ordered:
-            row.append(r + num_nodes)
-            column.append(c + num_nodes)
-            feats.append(torch.tensor(labels, dtype=torch.float32, device=self.device))
-            num_nodes += labels.shape[0]
-
-        row = np.concatenate(row, axis=0)
-        column = np.concatenate(column, axis=0)
-        feats = torch.cat(feats, dim=0)
-        if self.training:
-            n_edges = row.shape[0]
-            sampled_edges = np.random.permutation(n_edges)[int(n_edges * self.dropout):]
-            row = row[sampled_edges]
-            column = column[sampled_edges]
-
-        g = dgl.graph((row, column), device=self.device)
-        all_rep = []
-        x = feats
-        for layer in self.layers:
-            x = torch.tanh(layer(g, x))
-            all_rep.append(x)
-        all_rep = torch.cat(all_rep, dim=1)
-        users = feats[:, 0] == 1.
-        items = feats[:, 2] == 1.
-        x = torch.cat([all_rep[users, :], all_rep[items, :]], dim=1)
-        x = F.relu(self.lin1(x))
-        x = F.dropout(x, p=0.5, training=self.training)
-        x = self.lin2(x)
-        return x.squeeze()
-
-    def bpr_forward(self, users, pos_items, neg_items):
-        users, pos_items, neg_items = users.cpu().numpy(), pos_items.cpu().numpy(), neg_items.cpu().numpy()
-        pos_scores = self.forward(users, pos_items)
-        neg_scores = self.forward(users, neg_items)
-        l2_norm = torch.norm(self.lin1.weight, p=2) ** 2 + torch.norm(self.lin1.weight, p=2) ** 2
-        for layer in self.layers:
-            l2_norm += torch.norm(layer.weight, p=2) ** 2
-        ones = torch.ones([1, 1], dtype=torch.float32, device=self.device)
-        return ones, pos_scores[:, None], neg_scores[:, None], l2_norm[None]
-
-    def predict(self, users):
-        items = torch.arange(self.n_items, dtype=torch.int64, device=self.device).repeat(users.shape[0])
-        users = users[:, None].repeat(1, self.n_items).flatten()
-        scores = self.forward(users, items)
-        scores = scores.reshape(-1, self.n_items)
-        return scores
 
 
 class MultiVAE(BasicModel):

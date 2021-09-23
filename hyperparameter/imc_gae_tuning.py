@@ -26,7 +26,7 @@ def fitness(lr, l2_reg, dropout):
 def main():
     log_path = __file__[:-3]
     init_run(log_path, 2021)
-    param_grid = {'lr': [1.e-3], 'l2_reg': [0., 1.e-5, 1.e-4], 'dropout': [0.3, 0.5, 0.7]}
+    param_grid = {'lr': [1.e-3], 'l2_reg': [0., 1.e-5], 'dropout': [0.3, 0.5, 0.7, 0.9]}
     grid = ParameterGrid(param_grid)
     max_ndcg = -np.inf
     best_params = None

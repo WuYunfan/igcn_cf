@@ -61,8 +61,3 @@ class Unbuffered(object):
     def __getattr__(self, attr):
         return getattr(self.stream, attr)
 
-
-def one_hot(x, length):
-    one_hot_x = np.zeros([x.shape[0], length], dtype=np.float32)
-    one_hot_x[np.arange(x.shape[0]), x] = 1.0
-    return one_hot_x

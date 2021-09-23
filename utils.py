@@ -64,5 +64,5 @@ class Unbuffered(object):
 
 def one_hot(x, length):
     one_hot_x = np.zeros([x.shape[0], length], dtype=np.float32)
-    one_hot_x[np.arange(len(x.shape[0])), x] = 1.0
+    one_hot_x[np.arange(x.shape[0]), x] = 1.0
     return one_hot_x

@@ -13,10 +13,10 @@ def fitness(lr, l2_reg, dropout):
     dataset_config = {'name': 'ProcessedDataset', 'path': 'data/Gowalla/time',
                       'device': device}
     model_config = {'name': 'IGMC', 'layer_sizes': [64, 64, 64, 64], 'device': device,
-                    'dropout': dropout, 'h_hop': 1}
+                    'dropout': dropout}
     trainer_config = {'name': 'BPRTrainer', 'optimizer': 'Adam', 'lr': lr, 'l2_reg': l2_reg,
                       'device': device, 'n_epochs': 1000, 'batch_size': 2048, 'dataloader_num_workers': 6,
-                      'test_batch_size': 512, 'topks': [20]}
+                      'test_batch_size': 64, 'topks': [20]}
     dataset = get_dataset(dataset_config)
     model = get_model(model_config, dataset)
     trainer = get_trainer(trainer_config, dataset, model)

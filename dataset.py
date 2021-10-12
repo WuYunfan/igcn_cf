@@ -234,7 +234,7 @@ class AmazonDataset(BasicDataset):
         with open(input_file_path, 'r') as f:
             line = f.readline().strip()
             while line:
-                i, u, r, _ = line.split(',')
+                u, i, r, _ = line.split(',')
                 r = float(r)
                 if r > 3.:
                     update_ui_sets(u, i, user_inter_sets, item_inter_sets)
@@ -245,7 +245,7 @@ class AmazonDataset(BasicDataset):
         with open(input_file_path, 'r') as f:
             line = f.readline().strip()
             while line:
-                i, u, r, t = line.split(',')
+                u, i, r, t = line.split(',')
                 r = float(r)
                 if r > 3.:
                     t = int(t)

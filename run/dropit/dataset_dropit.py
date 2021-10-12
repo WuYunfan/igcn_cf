@@ -1,27 +1,23 @@
 import numpy as np
 import torch
 from dataset import get_dataset
-from utils import set_seed, output_dataset
 
 
-def dropit_dataset(dataset, ratio, random=True):
+def dropit_dataset(dataset, ratio):
     for user in range(dataset.n_users):
         num_items = int(len(dataset.train_data[user]) * ratio)
-        if not random:
-            dataset.train_data[user] = dataset.train_data[user][:num_items]
-            continue
-        train_items = np.random.choice(dataset.train_data[user], size=num_items, replace=False)
-        dataset.train_data[user] = train_items.tolist()
+        dataset.train_data[user] = dataset.train_data[user][:num_items]
 
 
 def main():
-    set_seed(2021)
-    device = torch.device('cuda')
-    dataset_config = {'name': 'LGCNDataset', 'path': 'data/LGCN/gowalla',
-                      'device': device, 'val_ratio': 0.}
-    dataset = get_dataset(dataset_config)
-    dropit_dataset(dataset, 0.8)
-    output_dataset(dataset, 'data/LGCN/gowalla_it_0_8')
+    for i in range(5):
+        n = str(i)
+        device = torch.device('cuda')
+        dataset_config = {'name': 'ProcessedDataset', 'path': 'data/Amazon/' + n,
+                          'device': device}
+        dataset = get_dataset(dataset_config)
+        dropit_dataset(dataset, 0.8)
+        dataset.output_dataset('data/Amazon/' + n + '_dropit')
 
 
 if __name__ == '__main__':

@@ -2,11 +2,9 @@ from dataset import get_dataset
 from model import get_model
 from trainer import get_trainer
 import torch
-from utils import init_run, set_seed
+from utils import init_run
 from tensorboardX import SummaryWriter
-from torch.nn.init import normal_, zeros_
-from config import get_gowalla_config, get_yelp_config, get_ml1m_config
-import numpy as np
+from config import get_gowalla_config, get_yelp_config, get_amazon_config
 from sklearn.preprocessing import normalize
 
 
@@ -17,7 +15,7 @@ def main():
     device = torch.device('cuda')
     config = get_gowalla_config(device)
     dataset_config, model_config, trainer_config = config[5]
-    dataset_config['path'] = 'data/LGCN/gowalla_ui_0_8'
+    dataset_config['path'] = dataset_config['path'][:-4] + '0_dropui'
 
     writer = SummaryWriter(log_path)
     dataset = get_dataset(dataset_config)
@@ -26,7 +24,7 @@ def main():
     trainer.train(verbose=True, writer=writer)
     writer.close()
 
-    dataset_config['path'] = 'data/LGCN/gowalla_shuffled'
+    dataset_config['path'] = dataset_config['path'][:-7]
     new_dataset = get_dataset(dataset_config)
     model.config['dataset'] = new_dataset
     model.n_users, model.n_items = new_dataset.n_users, new_dataset.n_items

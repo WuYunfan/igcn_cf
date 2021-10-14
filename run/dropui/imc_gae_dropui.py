@@ -13,7 +13,7 @@ def main():
 
     device = torch.device('cuda')
     config = get_gowalla_config(device)
-    dataset_config, model_config, trainer_config = config[1]
+    dataset_config, model_config, trainer_config = config[7]
     dataset_config['path'] = dataset_config['path'][:-4] + '0_dropui'
 
     writer = SummaryWriter(log_path)

@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import scipy.sparse as sp
 import numpy as np
-from utils import get_sparse_tensor
+from utils import get_sparse_tensor, graph_rank_nodes
 from torch.nn.init import kaiming_uniform_, xavier_normal, normal_, zeros_, ones_
 import sys
 import torch.nn.functional as F
@@ -265,7 +265,8 @@ class IGCN(BasicModel):
         self.delta = model_config.get('delta', 0.99)
         self.norm_adj = self.generate_graph(model_config['dataset'])
         self.feat_mat, self.user_map, self.item_map, self.row_sum = \
-            self.generate_feat(model_config['dataset'], core_ranking=model_config.get('core_ranking', None))
+            self.generate_feat(model_config['dataset'],
+                               ranking_metric=model_config.get('ranking_metric', 'normalized_degree'))
         self.update_feat_mat()
 
         self.embedding = nn.Embedding(self.feat_mat.shape[1], self.embedding_size)
@@ -284,19 +285,11 @@ class IGCN(BasicModel):
     def generate_graph(self, dataset):
         return LightGCN.generate_graph(self, dataset)
 
-    def generate_feat(self, dataset, is_updating=False, core_ranking=None):
+    def generate_feat(self, dataset, is_updating=False, ranking_metric=None):
         if not is_updating:
-            if core_ranking:
-                core_ranking = np.load(core_ranking)
-                ranked_users = core_ranking['ranked_users']
-                ranked_items = core_ranking['ranked_items']
-            else:
-                sub_mat = sp.coo_matrix((np.ones((len(dataset.train_array),)), np.array(dataset.train_array).T),
-                                        shape=(self.n_users, self.n_items), dtype=np.float32)
-                user_degree = np.array(np.sum(sub_mat, axis=1)).squeeze()
-                item_degree = np.array(np.sum(sub_mat, axis=0)).squeeze()
-                ranked_users = np.argsort(user_degree)[::-1].copy()
-                ranked_items = np.argsort(item_degree)[::-1].copy()
+            adj_mat = sp.coo_matrix((np.ones((len(dataset.train_array),)), np.array(dataset.train_array).T),
+                                    shape=(self.n_users, self.n_items), dtype=np.float32)
+            ranked_users, ranked_items = graph_rank_nodes(adj_mat, ranking_metric)
 
             core_users = ranked_users[:int(self.n_users * self.feature_ratio)]
             core_items = ranked_items[:int(self.n_items * self.feature_ratio)]
@@ -385,7 +378,7 @@ class AttIGCN(IGCN):
         self.size_chunk = int(1e5)
         self.norm_adj = self.generate_graph(model_config['dataset'])
         self.feat_mat, self.user_map, self.item_map, self.row_sum = self.generate_feat(model_config['dataset'])
-        self.feat_mat_anneal()
+        self.update_feat_mat()
 
         self.embedding = nn.Embedding(self.feat_mat.shape[1], self.embedding_size)
         kaiming_uniform_(self.embedding.weight)

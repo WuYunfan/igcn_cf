@@ -3,6 +3,9 @@ import torch
 import random
 import os
 import sys
+import scipy.sparse as sp
+from sklearn.preprocessing import normalize
+import networkx as nx
 
 
 def set_seed(seed=0):
@@ -32,6 +35,32 @@ def get_sparse_tensor(mat, device):
     data = torch.tensor(coo.data, dtype=torch.float32, device=device)
     sp_tensor = torch.sparse.FloatTensor(indexes, data, torch.Size(coo.shape)).coalesce()
     return sp_tensor
+
+
+def graph_rank_nodes(adj_mat, ranking_metric):
+    n_users, n_items = adj_mat.shape[0], adj_mat.shape[1]
+    sub_mat = adj_mat
+    adj_mat = sp.lil_matrix((n_users + n_items, n_users + n_items), dtype=np.float32)
+    adj_mat[:n_users, n_users:] = sub_mat
+    adj_mat[n_users:, :n_users] = sub_mat.T
+    if ranking_metric == 'degree':
+        user_metrics = np.array(np.sum(adj_mat[:n_users], axis=1)).squeeze()
+        item_metrics = np.array(np.sum(adj_mat[n_users:], axis=1)).squeeze()
+    elif ranking_metric == 'normalized_degree':
+        normalized_adj_mat = normalize(adj_mat, axis=1, norm='l1')
+        user_metrics = np.array(np.sum(normalized_adj_mat[:n_users], axis=0)).squeeze()
+        item_metrics = np.array(np.sum(normalized_adj_mat[n_users:], axis=0)).squeeze()
+    elif ranking_metric == 'page_rank':
+        g = nx.Graph()
+        g.add_edges_from(np.array(np.nonzero(adj_mat)).T)
+        pr = nx.pagerank(g)
+        pr = np.array([pr[i] for i in range(n_users + n_items)])
+        user_metrics, item_metrics = pr[:n_users], pr[n_users:]
+    else:
+        return None
+    ranked_users = np.argsort(user_metrics)[::-1].copy()
+    ranked_items = np.argsort(item_metrics)[::-1].copy()
+    return ranked_users, ranked_items
 
 
 class AverageMeter:

@@ -40,6 +40,13 @@ def main():
     print('Transductive model results.')
     trainer.inductive_eval(dataset.n_users, dataset.n_items)
 
+    model_config['name'] = 'Popularity'
+    trainer_config['name'] = 'BasicTrainer'
+    model = get_model(model_config, new_dataset)
+    trainer = get_trainer(trainer_config, new_dataset, model)
+    print('Popularity model results.')
+    trainer.inductive_eval(dataset.n_users, dataset.n_items)
+
 
 if __name__ == '__main__':
     main()

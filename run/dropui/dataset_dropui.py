@@ -16,21 +16,26 @@ def resize_dataset(dataset, ratio):
         val_items = val_items[val_items < n_items]
         dataset.val_data[user] = val_items.tolist()
 
+        test_items = np.array(dataset.test_data[user])
+        test_items = test_items[test_items < n_items]
+        dataset.test_data[user] = test_items.tolist()
+
     dataset.n_users = n_users
     dataset.n_items = n_items
     dataset.train_data = dataset.train_data[:n_users]
     dataset.val_data = dataset.val_data[:n_users]
+    dataset.test_data = dataset.test_data[:n_users]
 
 
 def main():
     for i in range(5):
         n = str(i)
         device = torch.device('cuda')
-        dataset_config = {'name': 'ProcessedDataset', 'path': 'data/Gowalla/' + n,
+        dataset_config = {'name': 'ProcessedDataset', 'path': 'data/Amazon/' + n,
                           'device': device}
         dataset = get_dataset(dataset_config)
         resize_dataset(dataset, 0.8)
-        dataset.output_dataset('data/Gowalla/' + n + '_dropui')
+        dataset.output_dataset('data/Amazon/' + n + '_dropui')
 
 
 if __name__ == '__main__':

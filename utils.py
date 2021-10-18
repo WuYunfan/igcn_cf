@@ -44,12 +44,12 @@ def graph_rank_nodes(adj_mat, ranking_metric):
     adj_mat[:n_users, n_users:] = sub_mat
     adj_mat[n_users:, :n_users] = sub_mat.T
     if ranking_metric == 'degree':
-        user_metrics = np.array(np.sum(adj_mat[:n_users], axis=1)).squeeze()
-        item_metrics = np.array(np.sum(adj_mat[n_users:], axis=1)).squeeze()
+        user_metrics = np.array(np.sum(adj_mat[:n_users, :], axis=1)).squeeze()
+        item_metrics = np.array(np.sum(adj_mat[n_users:, :], axis=1)).squeeze()
     elif ranking_metric == 'normalized_degree':
         normalized_adj_mat = normalize(adj_mat, axis=1, norm='l1')
-        user_metrics = np.array(np.sum(normalized_adj_mat[:n_users], axis=0)).squeeze()
-        item_metrics = np.array(np.sum(normalized_adj_mat[n_users:], axis=0)).squeeze()
+        user_metrics = np.array(np.sum(normalized_adj_mat[:, :n_users], axis=0)).squeeze()
+        item_metrics = np.array(np.sum(normalized_adj_mat[:, n_users:], axis=0)).squeeze()
     elif ranking_metric == 'page_rank':
         g = nx.Graph()
         g.add_edges_from(np.array(np.nonzero(adj_mat)).T)

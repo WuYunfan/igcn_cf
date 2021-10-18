@@ -377,7 +377,8 @@ class AttIGCN(IGCN):
         self.alpha = 0.
         self.size_chunk = int(1e5)
         self.norm_adj = self.generate_graph(model_config['dataset'])
-        self.feat_mat, self.user_map, self.item_map, self.row_sum = self.generate_feat(model_config['dataset'])
+        self.feat_mat, self.user_map, self.item_map, self.row_sum =\
+            self.generate_feat(model_config['dataset'], ranking_metric='degree')
         self.update_feat_mat()
 
         self.embedding = nn.Embedding(self.feat_mat.shape[1], self.embedding_size)
@@ -412,7 +413,7 @@ class AttIGCN(IGCN):
 
         row_max_alpha = dgl.ops.gspmm(g, 'copy_rhs', 'max', lhs_data=None, rhs_data=alpha)
         alpha = alpha - row_max_alpha[row, :]
-        alpha = torch.exp(alpha / np.sqrt(self.embedding_size))
+        alpha = torch.exp(alpha / np.sqrt(self.embedding_size) / 10.)
         row_sum_alpha = dgl.ops.gspmm(g, 'copy_rhs', 'sum', lhs_data=None, rhs_data=alpha)
         alpha = alpha / row_sum_alpha[row, :]
         alpha = alpha.mean(-1)
@@ -545,7 +546,7 @@ class MultiVAE(BasicModel):
     def predict(self, users):
         scores, _, _ = self.ml_forward(users)
         if scores.shape[1] < self.n_items:
-            padding = torch.full([scores.shape[0], self.n_items - scores.shaep[1]], -np.inf, device=self.device)
+            padding = torch.full([scores.shape[0], self.n_items - scores.shape[1]], -np.inf, device=self.device)
             scores = torch.cat([scores, padding], dim=1)
         return scores
 

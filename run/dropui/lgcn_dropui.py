@@ -31,7 +31,7 @@ def main():
     with torch.no_grad():
         old_embedding = model.embedding.weight
         model.embedding = torch.nn.Embedding(new_dataset.n_users + new_dataset.n_items, model.embedding_size, device=device)
-        model.embedding.weight = old_embedding.mean(dim=0)[None, :]
+        model.embedding.weight[:, :] = old_embedding.mean(dim=0)[None, :].expand(model.embedding.weight.shape)
         model.embedding.weight[:dataset.n_users, :] = old_embedding[:dataset.n_users, :]
         model.embedding.weight[new_dataset.n_users:new_dataset.n_users + dataset.n_items, :] = \
             old_embedding[dataset.n_users:, :]

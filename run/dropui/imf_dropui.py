@@ -30,7 +30,6 @@ def main():
     model.feat_mat, _, _, model.row_sum = model.generate_feat(new_dataset, is_updating=True)
     model.update_feat_mat()
     trainer = get_trainer(trainer_config, new_dataset, model)
-    print('Inductive results.')
     trainer.inductive_eval(dataset.n_users, dataset.n_items)
 
 

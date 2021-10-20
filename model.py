@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import scipy.sparse as sp
 import numpy as np
-from utils import get_sparse_tensor, graph_rank_nodes
+from utils import get_sparse_tensor, graph_rank_nodes, generate_daj_mat
 from torch.nn.init import kaiming_uniform_, xavier_normal, normal_, zeros_, ones_
 import sys
 import torch.nn.functional as F
@@ -83,12 +83,7 @@ class LightGCN(BasicModel):
         self.to(device=self.device)
 
     def generate_graph(self, dataset):
-        sub_mat = sp.coo_matrix((np.ones((len(dataset.train_array),)), np.array(dataset.train_array).T),
-                                shape=(self.n_users, self.n_items), dtype=np.float32)
-        adj_mat = sp.lil_matrix((self.n_users + self.n_items, self.n_users + self.n_items), dtype=np.float32)
-        adj_mat[:self.n_users, self.n_users:] = sub_mat
-        adj_mat[self.n_users:, :self.n_users] = sub_mat.T
-        adj_mat.tocsr()
+        adj_mat = generate_daj_mat(dataset)
         degree = np.array(np.sum(adj_mat, axis=1)).squeeze()
         degree = np.maximum(1., degree)
         d_inv = np.power(degree, -0.5)
@@ -151,12 +146,7 @@ class NGCF(BasicModel):
         self.to(device=self.device)
 
     def generate_graph(self, dataset):
-        sub_mat = sp.coo_matrix((np.ones((len(dataset.train_array),)), np.array(dataset.train_array).T),
-                                shape=(self.n_users, self.n_items), dtype=np.float32)
-        adj_mat = sp.lil_matrix((self.n_users + self.n_items, self.n_users + self.n_items), dtype=np.float32)
-        adj_mat[:self.n_users, self.n_users:] = sub_mat
-        adj_mat[self.n_users:, :self.n_users] = sub_mat.T
-        adj_mat = adj_mat.tocsr()
+        adj_mat = generate_daj_mat(dataset)
         adj_mat = adj_mat + sp.eye(adj_mat.shape[0], format='csr')
 
         norm_adj = normalize(adj_mat, axis=1, norm='l1')
@@ -287,9 +277,7 @@ class IGCN(BasicModel):
 
     def generate_feat(self, dataset, is_updating=False, ranking_metric=None):
         if not is_updating:
-            adj_mat = sp.coo_matrix((np.ones((len(dataset.train_array),)), np.array(dataset.train_array).T),
-                                    shape=(self.n_users, self.n_items), dtype=np.float32)
-            ranked_users, ranked_items = graph_rank_nodes(adj_mat, ranking_metric)
+            ranked_users, ranked_items = graph_rank_nodes(dataset, ranking_metric)
 
             core_users = ranked_users[:int(self.n_users * self.feature_ratio)]
             core_items = ranked_items[:int(self.n_items * self.feature_ratio)]

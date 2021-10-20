@@ -158,13 +158,13 @@ def get_amazon_config(device):
                       'test_batch_size': 512, 'topks': [20]}
     amazon_config.append((dataset_config, model_config, trainer_config))
 
-    model_config = {'name': 'ItemKNN', 'k': 1000, 'device': device}
+    model_config = {'name': 'ItemKNN', 'k': 10, 'device': device}
     trainer_config = {'name': 'BasicTrainer',  'device': device, 'n_epochs': 0,
                       'test_batch_size': 512, 'topks': [20]}
     amazon_config.append((dataset_config, model_config, trainer_config))
 
     model_config = {'name': 'NGCF', 'embedding_size': 64, 'layer_sizes': [64, 64, 64],
-                    'device': device, 'dropout': 0.}
+                    'device': device, 'dropout': 0.3}
     trainer_config = {'name': 'BPRTrainer', 'optimizer': 'Adam', 'lr': 1.e-3, 'l2_reg': 1.e-4,
                       'device': device, 'n_epochs': 1000, 'batch_size': 2048, 'dataloader_num_workers': 6,
                       'test_batch_size': 512, 'topks': [20]}
@@ -186,7 +186,7 @@ def get_amazon_config(device):
 
     model_config = {'name': 'IMCGAE', 'embedding_size': 64, 'n_layers': 3, 'device': device,
                     'dropout': 0.9}
-    trainer_config = {'name': 'BPRTrainer', 'optimizer': 'Adam', 'lr': 1.e-3, 'l2_reg': 1.e-5,
+    trainer_config = {'name': 'BPRTrainer', 'optimizer': 'Adam', 'lr': 1.e-3, 'l2_reg': 0.,
                       'device': device, 'n_epochs': 1000, 'batch_size': 2048, 'dataloader_num_workers': 6,
                       'test_batch_size': 512, 'topks': [20]}
     amazon_config.append((dataset_config, model_config, trainer_config))

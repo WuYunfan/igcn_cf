@@ -37,25 +37,32 @@ def get_sparse_tensor(mat, device):
     return sp_tensor
 
 
-def graph_rank_nodes(adj_mat, ranking_metric):
-    n_users, n_items = adj_mat.shape[0], adj_mat.shape[1]
-    sub_mat = adj_mat
-    adj_mat = sp.lil_matrix((n_users + n_items, n_users + n_items), dtype=np.float32)
-    adj_mat[:n_users, n_users:] = sub_mat
-    adj_mat[n_users:, :n_users] = sub_mat.T
+def generate_daj_mat(dataset):
+    train_array = np.array(dataset.train_array)
+    users, items = train_array[:, 0], train_array[:, 1]
+    row = np.concatenate([users, items + dataset.n_users], axis=0)
+    column = np.concatenate([items + dataset.n_users, users], axis=0)
+    adj_mat = sp.coo_matrix((np.ones(row.shape), np.stack([row, column], axis=0)),
+                            shape=(dataset.n_users + dataset.n_items, dataset.n_users + dataset.n_items),
+                            dtype=np.float32).tocsr()
+    return adj_mat
+
+
+def graph_rank_nodes(dataset, ranking_metric):
+    adj_mat = generate_daj_mat(dataset)
     if ranking_metric == 'degree':
-        user_metrics = np.array(np.sum(adj_mat[:n_users, :], axis=1)).squeeze()
-        item_metrics = np.array(np.sum(adj_mat[n_users:, :], axis=1)).squeeze()
+        user_metrics = np.array(np.sum(adj_mat[:dataset.n_users, :], axis=1)).squeeze()
+        item_metrics = np.array(np.sum(adj_mat[dataset.n_users:, :], axis=1)).squeeze()
     elif ranking_metric == 'normalized_degree':
         normalized_adj_mat = normalize(adj_mat, axis=1, norm='l1')
-        user_metrics = np.array(np.sum(normalized_adj_mat[:, :n_users], axis=0)).squeeze()
-        item_metrics = np.array(np.sum(normalized_adj_mat[:, n_users:], axis=0)).squeeze()
+        user_metrics = np.array(np.sum(normalized_adj_mat[:, :dataset.n_users], axis=0)).squeeze()
+        item_metrics = np.array(np.sum(normalized_adj_mat[:, dataset.n_users:], axis=0)).squeeze()
     elif ranking_metric == 'page_rank':
         g = nx.Graph()
         g.add_edges_from(np.array(np.nonzero(adj_mat)).T)
         pr = nx.pagerank(g)
-        pr = np.array([pr[i] for i in range(n_users + n_items)])
-        user_metrics, item_metrics = pr[:n_users], pr[n_users:]
+        pr = np.array([pr[i] for i in range(dataset.n_users + dataset.n_items)])
+        user_metrics, item_metrics = pr[:dataset.n_users], pr[dataset.n_users:]
     else:
         return None
     ranked_users = np.argsort(user_metrics)[::-1].copy()

@@ -7,9 +7,10 @@ import matplotlib.pyplot as plt
 import dgl
 import scipy.sparse as sp
 from matplotlib.backends.backend_pdf import PdfPages
-
+import pandas as pd
 
 def main():
+    """
     device = torch.device('cpu')
     config = get_gowalla_config(device)
     dataset_config, model_config, _ = config[2]
@@ -51,7 +52,7 @@ def main():
     axes[0].ticklabel_format(axis='x', style='sci', scilimits=(0, 0))
     axes[0].set_xlabel('Weight', fontsize=17)
     axes[0].set_ylabel('Frequency', fontsize=17)
-    axes[0].set_title('Attention weights around a user', fontsize=17)
+    axes[0].set_title('Attention weights on the interactions of a user', fontsize=17)
     axes[0].tick_params(labelsize=14)
 
     eps = 2.e-5
@@ -61,7 +62,7 @@ def main():
     axes[1].ticklabel_format(axis='x', style='sci', scilimits=(0, 0))
     axes[1].set_xlabel('Weight', fontsize=17)
     axes[1].set_ylabel('Frequency', fontsize=17)
-    axes[1].set_title('Attention weights around a item', fontsize=17)
+    axes[1].set_title('Attention weights on the interactions of an item', fontsize=17)
     axes[1].tick_params(labelsize=14)
     pdf.savefig()
     plt.close(fig)
@@ -90,6 +91,7 @@ def main():
     pdf.savefig()
     plt.close(fig)
     pdf.close()
+    """
 
     mf = [11.934] * 10
     imf_d = [9.094, 10.985, 11.953, 12.722, 13.261, 13.545, 13.63, 13.791, 13.994, 14.051]
@@ -104,24 +106,77 @@ def main():
     fig, ax = plt.subplots(nrows=1, ncols=2, constrained_layout=True, figsize=(11, 4))
     axes = ax.flatten()
     axes[0].plot(ratio, np.array(mf) / 100., label='MF', marker='s')
-    axes[0].plot(ratio, np.array(imf_d) / 100., label='IMF-degree', marker='v')
-    axes[0].plot(ratio, np.array(imf_nd) / 100., label='IMF-normalized_degree', marker='o')
-    axes[0].plot(ratio, np.array(imf_pr) / 100., label='IMF-page_rank', marker='d')
+    axes[0].plot(ratio, np.array(imf_d) / 100., label='INMO-MF-degree', marker='v')
+    axes[0].plot(ratio, np.array(imf_nd) / 100., label='INMO-MF-normalized_degree', marker='o')
+    axes[0].plot(ratio, np.array(imf_pr) / 100., label='INMO-MF-page_rank', marker='d')
     axes[0].set_xticks(ratio)
-    axes[0].legend(fontsize=14)
+    axes[0].legend(fontsize=13)
     axes[0].set_xlabel('Percentage of core users and core items', fontsize=17)
     axes[0].set_ylabel('NDCG@20', fontsize=17)
+    axes[0].set_title('INMO-MF', fontsize=17)
     axes[1].plot(ratio, np.array(lgcn) / 100., label='LightGCN', marker='s')
-    axes[1].plot(ratio, np.array(igcn_d) / 100., label='IGCN-degree', marker='v')
-    axes[1].plot(ratio, np.array(igcn_nd) / 100., label='IGCN-normalized_degree', marker='o')
-    axes[1].plot(ratio, np.array(igcn_pr) / 100., label='IGCN-page_rank', marker='d')
+    axes[1].plot(ratio, np.array(igcn_d) / 100., label='INMO-LGCN-degree', marker='v')
+    axes[1].plot(ratio, np.array(igcn_nd) / 100., label='INMO-LGCN-normalized_degree', marker='o')
+    axes[1].plot(ratio, np.array(igcn_pr) / 100., label='INMO-LGCN-page_rank', marker='d')
     axes[1].set_xticks(ratio)
-    axes[1].legend(fontsize=14)
+    axes[1].legend(fontsize=13)
     axes[1].set_xlabel('Percentage of core users and core items', fontsize=17)
     axes[1].set_ylabel('NDCG@20', fontsize=17)
+    axes[1].set_title('INMO-LGCN', fontsize=17)
     pdf.savefig()
     plt.close(fig)
+    pdf.close()
 
+    imf = [13.848, 13.862, 13.906, 13.958, 13.751]
+    igcn = [15.315, 15.378, 15.391, 15.172, 14.639]
+    beta = ['0', '0.001', '0.01', '0.1', '1']
+    pdf = PdfPages('figure_3.pdf')
+    fig, ax = plt.subplots(nrows=1, ncols=2, constrained_layout=True, figsize=(11, 4))
+    axes = ax.flatten()
+    axes[0].plot(np.array(imf) / 100., marker='s')
+    axes[0].set_xticks([0, 1, 2, 3, 4])
+    axes[0].set_xticklabels(beta)
+    axes[0].set_xlabel('Weight of self-enhanced loss', fontsize=17)
+    axes[0].set_ylabel('NDCG@20', fontsize=17)
+    axes[0].set_title('INMO-MF', fontsize=17)
+    axes[1].plot(np.array(igcn) / 100., marker='s')
+    axes[1].set_xticks([0, 1, 2, 3, 4])
+    axes[1].set_xticklabels(beta)
+    axes[1].set_xlabel('Weight of self-enhanced loss', fontsize=17)
+    axes[1].set_ylabel('NDCG@20', fontsize=17)
+    axes[1].set_title('INMO-LGCN', fontsize=17)
+    pdf.savefig()
+    plt.close(fig)
+    pdf.close()
+
+    def read_csv_log(path):
+        df = pd.read_csv(path)
+        x = df['Step'].values
+        y = df['Value'].values
+        return x, y
+
+    pdf = PdfPages('figure_4.pdf')
+    fig, ax = plt.subplots(nrows=1, ncols=2, constrained_layout=True, figsize=(11, 4))
+    axes = ax.flatten()
+    x, y = read_csv_log('/Users/wuyunfan/work/papers/21-3-code/igcn/logs/final/imf/gowalla/1/csv.csv')
+    axes[0].plot(x, y, label='INMO-MF')
+    x, y = read_csv_log('/Users/wuyunfan/work/papers/21-3-code/igcn/logs/ablation/anneal/imf/csv.csv')
+    axes[0].plot(x, y, label='INMO-MF w/o NA')
+    axes[0].set_xlabel('Epoch', fontsize=17)
+    axes[0].set_ylabel('NDCG@20', fontsize=17)
+    axes[0].set_title('INMO-MF', fontsize=17)
+    axes[0].legend(fontsize=14, loc=4)
+    x, y = read_csv_log('/Users/wuyunfan/work/papers/21-3-code/igcn/logs/final/igcn/gowalla/1/csv.csv')
+    axes[1].plot(x, y, label='INMO-LGCN')
+    x, y = read_csv_log('/Users/wuyunfan/work/papers/21-3-code/igcn/logs/ablation/anneal/igcn/csv.csv')
+    axes[1].plot(x, y, label='INMO-LGCN w/o NA')
+    axes[1].set_xlabel('Epoch', fontsize=17)
+    axes[1].set_ylabel('NDCG@20', fontsize=17)
+    axes[1].set_title('INMO-LGCN', fontsize=17)
+    axes[1].legend(fontsize=14, loc=4)
+    pdf.savefig()
+    plt.close(fig)
+    pdf.close()
 
 if __name__ == '__main__':
     main()

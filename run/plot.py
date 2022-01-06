@@ -9,6 +9,7 @@ import scipy.sparse as sp
 from matplotlib.backends.backend_pdf import PdfPages
 import pandas as pd
 
+
 def main():
     """
     device = torch.device('cpu')
@@ -177,6 +178,7 @@ def main():
     pdf.savefig()
     plt.close(fig)
     pdf.close()
+
 
 if __name__ == '__main__':
     main()

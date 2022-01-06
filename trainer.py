@@ -276,8 +276,8 @@ class IGCNTrainer(BasicTrainer):
             users_r = self.model.embedding(users)
             pos_items_r = self.model.embedding(pos_items + len(self.model.user_map))
             neg_items_r = self.model.embedding(neg_items + len(self.model.user_map))
-            pos_scores = torch.sum(users_r * pos_items_r, dim=1)
-            neg_scores = torch.sum(users_r * neg_items_r, dim=1)
+            pos_scores = torch.sum(users_r * pos_items_r * self.model.w[None, :], dim=1)
+            neg_scores = torch.sum(users_r * neg_items_r * self.model.w[None, :], dim=1)
             aux_loss = F.softplus(neg_scores - pos_scores).mean()
 
             reg_loss = self.l2_reg * l2_norm_sq.mean() + self.aux_reg * aux_loss

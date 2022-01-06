@@ -257,6 +257,7 @@ class IGCN(BasicModel):
                                ranking_metric=model_config.get('ranking_metric', 'normalized_degree'))
 
         self.embedding = nn.Embedding(self.feat_mat.shape[1], self.embedding_size)
+        self.w = nn.Parameter(torch.ones([self.embedding_size], dtype=torch.float32, device=self.device))
         normal_(self.embedding.weight, std=0.1)
         self.to(device=self.device)
 

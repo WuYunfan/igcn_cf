@@ -252,14 +252,26 @@ class IGCN(BasicModel):
         self.dropout = model_config['dropout']
         self.feature_ratio = model_config['feature_ratio']
         self.norm_adj = self.generate_graph(model_config['dataset'])
-        self.feat_mat, self.user_map, self.item_map = \
+        self.alpha = 1.
+        self.delta = model_config.get('delta', 0.99)
+        self.feat_mat, self.user_map, self.item_map, self.row_sum = \
             self.generate_feat(model_config['dataset'],
                                ranking_metric=model_config.get('ranking_metric', 'normalized_degree'))
+        self.update_feat_mat()
 
         self.embedding = nn.Embedding(self.feat_mat.shape[1], self.embedding_size)
         self.w = nn.Parameter(torch.ones([self.embedding_size], dtype=torch.float32, device=self.device))
         normal_(self.embedding.weight, std=0.1)
         self.to(device=self.device)
+
+    def update_feat_mat(self):
+        row, _ = self.feat_mat.indices()
+        edge_values = torch.pow(self.row_sum[row], (self.alpha - 1.) / 2. - 0.5)
+        self.feat_mat = torch.sparse.FloatTensor(self.feat_mat.indices(), edge_values, self.feat_mat.shape).coalesce()
+
+    def feat_mat_anneal(self):
+        self.alpha *= self.delta
+        self.update_feat_mat()
 
     def generate_graph(self, dataset):
         return LightGCN.generate_graph(self, dataset)
@@ -297,8 +309,9 @@ class IGCN(BasicModel):
             indices.append([self.n_users + item, user_dim + item_dim + 1])
         feat = sp.coo_matrix((np.ones((len(indices),)), np.array(indices).T),
                              shape=(self.n_users + self.n_items, user_dim + item_dim + 2), dtype=np.float32).tocsr()
+        row_sum = torch.tensor(np.array(np.sum(feat, axis=1)).squeeze(), dtype=torch.float32, device=self.device)
         feat = get_sparse_tensor(feat, self.device)
-        return feat, user_map, item_map
+        return feat, user_map, item_map, row_sum
 
     def inductive_rep_layer(self, feat_mat):
         padding_tensor = torch.empty([max(self.feat_mat.shape) - self.feat_mat.shape[1], self.embedding_size],
@@ -333,7 +346,7 @@ class IGCN(BasicModel):
 
     def save(self, path):
         params = {'sate_dict': self.state_dict(), 'user_map': self.user_map,
-                  'item_map': self.item_map}
+                  'item_map': self.item_map, 'alpha': self.alpha}
         torch.save(params, path)
 
     def load(self, path):
@@ -341,7 +354,9 @@ class IGCN(BasicModel):
         self.load_state_dict(params['sate_dict'])
         self.user_map = params['user_map']
         self.item_map = params['item_map']
-        self.feat_mat, _, _ = self.generate_feat(self.config['dataset'], is_updating=True)
+        self.alpha = params['alpha']
+        self.feat_mat, _, _, self.row_sum = self.generate_feat(self.config['dataset'], is_updating=True)
+        self.update_feat_mat()
 
 
 '''
@@ -353,11 +368,14 @@ class AttIGCN(IGCN):
         self.n_heads = 4
         self.dropout = model_config['dropout']
         self.feature_ratio = 1.
+        self.alpha = 0.
         self.size_chunk = int(1e5)
         self.norm_adj = self.generate_graph(model_config['dataset'])
-        self.feat_mat, self.user_map, self.item_map =\
-            self.generate_feat(model_config['dataset'], ranking_metric='degree')
-
+        self.feat_mat, self.user_map, self.item_map, self.row_sum = \
+            self.generate_feat(model_config['dataset'],
+                               ranking_metric=model_config.get('ranking_metric', 'normalized_degree'))
+        self.update_feat_mat()
+        
         self.embedding = nn.Embedding(self.feat_mat.shape[1], self.embedding_size)
         kaiming_uniform_(self.embedding.weight)
         self.weight_q = init_one_layer(self.embedding_size, self.embedding_size * self.n_heads)

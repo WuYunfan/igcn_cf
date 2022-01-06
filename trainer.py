@@ -245,7 +245,6 @@ class BPRTrainer(BasicTrainer):
             loss.backward()
             self.opt.step()
             losses.update(loss.item(), inputs.shape[0])
-        self.model.feat_mat_anneal()
         return losses.avg
 
 
@@ -287,6 +286,7 @@ class IGCNTrainer(BasicTrainer):
             loss.backward()
             self.opt.step()
             losses.update(loss.item(), inputs.shape[0])
+        self.model.feat_mat_anneal()
         return losses.avg
 
 

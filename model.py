@@ -251,8 +251,6 @@ class IGCN(BasicModel):
         self.n_layers = model_config['n_layers']
         self.dropout = model_config['dropout']
         self.feature_ratio = model_config['feature_ratio']
-        self.alpha = 1.
-        self.delta = model_config.get('delta', 0.99)
         self.norm_adj = self.generate_graph(model_config['dataset'])
         self.feat_mat, self.user_map, self.item_map = \
             self.generate_feat(model_config['dataset'],
@@ -334,7 +332,7 @@ class IGCN(BasicModel):
 
     def save(self, path):
         params = {'sate_dict': self.state_dict(), 'user_map': self.user_map,
-                  'item_map': self.item_map, 'alpha': self.alpha}
+                  'item_map': self.item_map}
         torch.save(params, path)
 
     def load(self, path):
@@ -342,9 +340,7 @@ class IGCN(BasicModel):
         self.load_state_dict(params['sate_dict'])
         self.user_map = params['user_map']
         self.item_map = params['item_map']
-        self.alpha = params['alpha']
-        self.feat_mat, _, _, self.row_sum = self.generate_feat(self.config['dataset'], is_updating=True)
-        self.update_feat_mat()
+        self.feat_mat, _, _ = self.generate_feat(self.config['dataset'], is_updating=True)
 
 
 '''
@@ -356,12 +352,10 @@ class AttIGCN(IGCN):
         self.n_heads = 4
         self.dropout = model_config['dropout']
         self.feature_ratio = 1.
-        self.alpha = 0.
         self.size_chunk = int(1e5)
         self.norm_adj = self.generate_graph(model_config['dataset'])
-        self.feat_mat, self.user_map, self.item_map, self.row_sum =\
+        self.feat_mat, self.user_map, self.item_map =\
             self.generate_feat(model_config['dataset'], ranking_metric='degree')
-        self.update_feat_mat()
 
         self.embedding = nn.Embedding(self.feat_mat.shape[1], self.embedding_size)
         kaiming_uniform_(self.embedding.weight)

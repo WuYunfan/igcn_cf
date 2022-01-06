@@ -254,33 +254,27 @@ class IGCN(BasicModel):
         self.alpha = 1.
         self.delta = model_config.get('delta', 0.99)
         self.norm_adj = self.generate_graph(model_config['dataset'])
-        self.feat_mat, self.user_map, self.item_map, self.row_sum = \
+        self.feat_mat, self.user_map, self.item_map = \
             self.generate_feat(model_config['dataset'],
                                ranking_metric=model_config.get('ranking_metric', 'normalized_degree'))
-        self.update_feat_mat()
 
         self.embedding = nn.Embedding(self.feat_mat.shape[1], self.embedding_size)
         normal_(self.embedding.weight, std=0.1)
         self.to(device=self.device)
-
-    def update_feat_mat(self):
-        row, _ = self.feat_mat.indices()
-        edge_values = torch.pow(self.row_sum[row], (self.alpha - 1.) / 2. - 0.5)
-        self.feat_mat = torch.sparse.FloatTensor(self.feat_mat.indices(), edge_values, self.feat_mat.shape).coalesce()
-
-    def feat_mat_anneal(self):
-        self.alpha *= self.delta
-        self.update_feat_mat()
 
     def generate_graph(self, dataset):
         return LightGCN.generate_graph(self, dataset)
 
     def generate_feat(self, dataset, is_updating=False, ranking_metric=None):
         if not is_updating:
-            ranked_users, ranked_items = graph_rank_nodes(dataset, ranking_metric)
+            if self.feature_ratio < 1.:
+                ranked_users, ranked_items = graph_rank_nodes(dataset, ranking_metric)
+                core_users = ranked_users[:int(self.n_users * self.feature_ratio)]
+                core_items = ranked_items[:int(self.n_items * self.feature_ratio)]
+            else:
+                core_users = np.arange(self.n_users, dtype=np.int64)
+                core_items = np.arange(self.n_items, dtype=np.int64)
 
-            core_users = ranked_users[:int(self.n_users * self.feature_ratio)]
-            core_items = ranked_items[:int(self.n_items * self.feature_ratio)]
             user_map = dict()
             for idx, user in enumerate(core_users):
                 user_map[user] = idx
@@ -304,9 +298,8 @@ class IGCN(BasicModel):
             indices.append([self.n_users + item, user_dim + item_dim + 1])
         feat = sp.coo_matrix((np.ones((len(indices),)), np.array(indices).T),
                              shape=(self.n_users + self.n_items, user_dim + item_dim + 2), dtype=np.float32).tocsr()
-        row_sum = torch.tensor(np.array(np.sum(feat, axis=1)).squeeze(), dtype=torch.float32, device=self.device)
         feat = get_sparse_tensor(feat, self.device)
-        return feat, user_map, item_map, row_sum
+        return feat, user_map, item_map
 
     def inductive_rep_layer(self, feat_mat):
         padding_tensor = torch.empty([max(self.feat_mat.shape) - self.feat_mat.shape[1], self.embedding_size],
@@ -354,6 +347,7 @@ class IGCN(BasicModel):
         self.update_feat_mat()
 
 
+'''
 class AttIGCN(IGCN):
     def __init__(self, model_config):
         BasicModel.__init__(self, model_config)
@@ -416,6 +410,7 @@ class AttIGCN(IGCN):
         users_r, pos_items_r, neg_items_r, l2_norm_sq = NGCF.bpr_forward(self, users, pos_items, neg_items)
         l2_norm_sq += torch.norm(self.weight_q.weight, p=2) ** 2 + torch.norm(self.weight_k.weight, p=2) ** 2
         return users_r, pos_items_r, neg_items_r, l2_norm_sq
+'''
 
 
 class IMF(IGCN):

@@ -42,8 +42,8 @@ def get_gowalla_config(device):
     gowalla_config.append((dataset_config, model_config, trainer_config))
 
     model_config = {'name': 'IMF', 'embedding_size': 64, 'n_layers': 0, 'device': device,
-                    'dropout': 0.3, 'feature_ratio': 1.}
-    trainer_config = {'name': 'IGCNTrainer', 'optimizer': 'Adam', 'lr': 1.e-3, 'l2_reg': 1.e-4, 'aux_reg': 0.1,
+                    'dropout': 0.1, 'feature_ratio': 1.}
+    trainer_config = {'name': 'IGCNTrainer', 'optimizer': 'Adam', 'lr': 1.e-3, 'l2_reg': 1.e-5, 'aux_reg': 0.1,
                       'device': device, 'n_epochs': 1000, 'batch_size': 2048, 'dataloader_num_workers': 6,
                       'test_batch_size': 512, 'topks': [20]}
     gowalla_config.append((dataset_config, model_config, trainer_config))
@@ -84,8 +84,8 @@ def get_yelp_config(device):
     yelp_config.append((dataset_config, model_config, trainer_config))
 
     model_config = {'name': 'IGCN', 'embedding_size': 64, 'n_layers': 3, 'device': device,
-                    'dropout': 0.1, 'feature_ratio': 1.}
-    trainer_config = {'name': 'IGCNTrainer', 'optimizer': 'Adam', 'lr': 1.e-3, 'l2_reg': 0., 'aux_reg': 0.001,
+                    'dropout': 0.3, 'feature_ratio': 1.}
+    trainer_config = {'name': 'IGCNTrainer', 'optimizer': 'Adam', 'lr': 1.e-3, 'l2_reg': 0., 'aux_reg': 0.01,
                       'device': device, 'n_epochs': 1000, 'batch_size': 2048, 'dataloader_num_workers': 6,
                       'test_batch_size': 512, 'topks': [20]}
     yelp_config.append((dataset_config, model_config, trainer_config))

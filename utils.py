@@ -48,8 +48,9 @@ def generate_daj_mat(dataset):
                             dtype=np.float32).tocsr()
     return adj_mat
 
-
-def greedy_or_sort(part_adj, u, ranking_metric):
+'''
+# This is for theoretical analysis.
+def greedy_or_sort(part_adj, u, ranking_metric, device):
     user_norm = np.linalg.norm(u, axis=1, ord=2) ** 2
     u_u_adj = part_adj.dot(part_adj.T)
     if ranking_metric == 'sort':
@@ -73,19 +74,41 @@ def greedy_or_sort(part_adj, u, ranking_metric):
     return user_metrics
 
 
+
+def greedy_or_sort(part_adj, u, ranking_metric, device):
+    normalized_adj_mat = normalize(part_adj, axis=0, norm='l1')
+    user_metrics = np.array(np.sum(normalized_adj_mat, axis=1)).squeeze()
+
+    user_degree = np.array(np.sum(part_adj, axis=1)).squeeze()
+    n_u = u / user_degree[:, None]
+    u = torch.tensor(u, dtype=torch.float32, device=device)
+    n_u = torch.tensor(n_u, dtype=torch.float32, device=device)
+    for i in range(u.shape[0]):
+        s_norm_sq = torch.norm(torch.mm(n_u, u[i, :][:, None]), p=2) ** 2
+        user_metrics[i] *= s_norm_sq.item()
+    return user_metrics
+'''
+
+
 def graph_rank_nodes(dataset, ranking_metric):
     adj_mat = generate_daj_mat(dataset)
     if ranking_metric == 'degree':
         user_metrics = np.array(np.sum(adj_mat[:dataset.n_users, :], axis=1)).squeeze()
         item_metrics = np.array(np.sum(adj_mat[dataset.n_users:, :], axis=1)).squeeze()
     elif ranking_metric == 'greedy' or ranking_metric == 'sort':
+        '''
+        # This is for theoretical analysis.
         part_adj = adj_mat[:dataset.n_users, dataset.n_users:]
         part_adj_tensor = get_sparse_tensor(part_adj, 'cpu')
         with torch.no_grad():
-            u, s, v = torch.svd_lowrank(part_adj_tensor, 64)
+            u, s, v = torch.svd_lowrank(part_adj_tensor, 4000)
             u, v = u.numpy(), v.numpy()
-        user_metrics = greedy_or_sort(part_adj, u, ranking_metric)
-        item_metrics = greedy_or_sort(part_adj.T, v, ranking_metric)
+        user_metrics = greedy_or_sort(part_adj, u, ranking_metric, dataset.device)
+        item_metrics = greedy_or_sort(part_adj.T, v, ranking_metric, dataset.device)
+        '''
+        normalized_adj_mat = normalize(adj_mat, axis=1, norm='l1')
+        user_metrics = np.array(np.sum(normalized_adj_mat[:, :dataset.n_users], axis=0)).squeeze()
+        item_metrics = np.array(np.sum(normalized_adj_mat[:, dataset.n_users:], axis=0)).squeeze()
     elif ranking_metric == 'page_rank':
         g = nx.Graph()
         g.add_edges_from(np.array(np.nonzero(adj_mat)).T)

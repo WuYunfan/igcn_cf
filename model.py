@@ -123,6 +123,109 @@ class LightGCN(BasicModel):
         return scores
 
 
+class RelationGAT(nn.Module):
+    def __init__(self, in_size, out_size):
+        super(RelationGAT, self).__init__()
+        self.wq = init_one_layer(in_size, out_size)
+        self.wk = init_one_layer(in_size, out_size)
+        self.wv = init_one_layer(in_size, out_size)
+
+    def forward(self, x, neighbors):
+        x = self.wq(x).unsqueeze(1)
+        key = self.wk(neighbors).unsqueeze(0)
+        gat_input = torch.sum(x * key, dim=2)
+        attn = F.softmax(gat_input, dim=1)
+        gat_output = self.wv(torch.matmul(attn, neighbors))
+        return gat_output
+
+
+class IDCF_LGCN(BasicModel):
+    def __init__(self, model_config):
+        super(IDCF_LGCN, self).__init__(model_config)
+        self.embedding_size = model_config['embedding_size']
+        self.n_layers = model_config['n_layers']
+        self.n_headers = model_config['n_headers']
+        self.n_samples = model_config.get('n_samples', 50)
+        self.n_old_users = self.n_users
+        self.n_old_items = self.n_items
+        self.embedding = nn.Embedding(self.n_users + self.n_items, self.embedding_size)
+        with torch.no_grad():
+            lgcn_path = model_config['lgcn_path']
+            self.embedding.weight.data = torch.load(lgcn_path, map_location=self.device)['embedding.weight']
+            self.embedding.weight.requires_grad = False
+        self.gat_units = []
+        for _ in range(self.n_headers):
+            self.gat_units.append(RelationGAT(self.embedding_size, self.embedding_size))
+        self.gat_units = nn.ModuleList(self.gat_units)
+        self.w_out = init_one_layer(self.embedding_size * self.n_headers, self.embedding_size)
+        self.norm_adj = self.generate_graph(model_config['dataset'])
+        self.feat_mat = self.generate_feat(model_config['dataset'])
+        self.to(device=self.device)
+
+    def generate_graph(self, dataset):
+        return LightGCN.generate_graph(self, dataset)
+
+    def generate_feat(self, dataset):
+        feat_mat = generate_daj_mat(dataset)
+        feat_mat = sp.hstack([feat_mat[:, :self.n_old_users], feat_mat[:, self.n_users:self.n_users + self.n_old_items]])
+        feat_mat = get_sparse_tensor(feat_mat, self.device)
+        return feat_mat
+
+    def get_rep(self, contrastive=False):
+        row, column = self.feat_mat.indices()
+        g = dgl.graph((column, row), num_nodes=self.feat_mat.shape[0], device=self.device)
+        x_q = dgl.ops.gspmm(g, 'mul', 'sum', lhs_data=self.embedding.weight, rhs_data=self.feat_mat.values())
+        gat_outputs = []
+        for i in range(self.n_headers):
+            sampled_users = np.random.randint(0, self.n_old_users, size=self.n_samples)
+            sampled_items = np.random.randint(0, self.n_old_items, size=self.n_samples)
+            sampled_user_embs = self.embedding.weight[sampled_users]
+            sampled_item_embs = self.embedding.weight[self.n_old_users + sampled_items]
+            user_reps = self.gat_units[i](x_q[:self.n_users], sampled_user_embs)
+            item_reps = self.gat_units[i](x_q[self.n_users:], sampled_item_embs)
+            gat_outputs.append(torch.cat([user_reps, item_reps], dim=0))
+        gat_outputs = torch.cat(gat_outputs, dim=1)
+        representations = self.w_out(gat_outputs)
+        if contrastive:
+            user_similarities = torch.sum(representations[:self.n_users].unsqueeze(1) * sampled_user_embs.unsqueeze(0),
+                                          dim=2)
+            user_self = torch.sum(representations[:self.n_users] * self.embedding.weight[:self.n_old_users], dim=1)
+            user_loss = torch.logsumexp(user_similarities, dim=1) - user_self
+            item_similarities = torch.sum(representations[self.n_users:].unsqueeze(1) * sampled_item_embs.unsqueeze(0),
+                                          dim=2)
+            item_self = torch.sum(representations[self.n_users:] * self.embedding.weight[self.n_old_users:], dim=1)
+            item_loss = torch.logsumexp(item_similarities, dim=1) - item_self
+            contrastive_loss = torch.cat([user_loss, item_loss], dim=0)
+
+        all_layer_rep = [representations]
+        row, column = self.norm_adj.indices()
+        g = dgl.graph((column, row), num_nodes=self.norm_adj.shape[0], device=self.device)
+        for _ in range(self.n_layers):
+            representations = dgl.ops.gspmm(g, 'mul', 'sum', lhs_data=representations, rhs_data=self.norm_adj.values())
+            all_layer_rep.append(representations)
+        all_layer_rep = torch.stack(all_layer_rep, dim=0)
+        final_rep = all_layer_rep.mean(dim=0)
+        if contrastive:
+            return final_rep, contrastive_loss
+        return final_rep
+
+    def bpr_forward(self, users, pos_items, neg_items):
+        rep, contrastive_loss = self.get_rep(contrastive=True)
+        contrastive_loss = contrastive_loss[users] + contrastive_loss[self.n_users + pos_items] \
+                           + contrastive_loss[self.n_users + neg_items]
+        users_r = rep[users, :]
+        pos_items_r, neg_items_r = rep[self.n_users + pos_items, :], rep[self.n_users + neg_items, :]
+        l2_norm_sq = torch.norm(users_r, p=2, dim=1) ** 2 + torch.norm(pos_items_r, p=2, dim=1) ** 2 \
+                     + torch.norm(neg_items_r, p=2, dim=1) ** 2
+        for i in range(self.n_headers):
+            l2_norm_sq += torch.norm(self.gat_units[i].wq.weight, p=2) ** 2
+            l2_norm_sq += torch.norm(self.gat_units[i].wk.weight, p=2) ** 2
+        return users_r, pos_items_r, neg_items_r, l2_norm_sq, contrastive_loss
+
+    def predict(self, users):
+        return LightGCN.predict(self, users)
+
+
 class NGCF(BasicModel):
     def __init__(self, model_config):
         super(NGCF, self).__init__(model_config)
@@ -256,7 +359,7 @@ class IGCN(BasicModel):
         self.delta = model_config.get('delta', 0.99)
         self.feat_mat, self.user_map, self.item_map, self.row_sum = \
             self.generate_feat(model_config['dataset'],
-                               ranking_metric=model_config.get('ranking_metric', 'normalized_degree'))
+                               ranking_metric=model_config.get('ranking_metric', 'sort'))
         self.update_feat_mat()
 
         self.embedding = nn.Embedding(self.feat_mat.shape[1], self.embedding_size)

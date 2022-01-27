@@ -248,6 +248,36 @@ class BPRTrainer(BasicTrainer):
         return losses.avg
 
 
+class IDCFTrainer(BasicTrainer):
+    def __init__(self, trainer_config):
+        super(IDCFTrainer, self).__init__(trainer_config)
+
+        self.dataloader = DataLoader(self.dataset, batch_size=trainer_config['batch_size'],
+                                     num_workers=trainer_config['dataloader_num_workers'])
+        self.initialize_optimizer()
+        self.l2_reg = trainer_config['l2_reg']
+        self.contrastive_reg = trainer_config['contrastive_reg']
+
+    def train_one_epoch(self):
+        losses = AverageMeter()
+        for batch_data in self.dataloader:
+            inputs = batch_data[:, 0, :].to(device=self.device, dtype=torch.int64)
+            users, pos_items, neg_items = inputs[:, 0],  inputs[:, 1],  inputs[:, 2]
+
+            users_r, pos_items_r, neg_items_r, l2_norm_sq, contrastive_loss = self.model.bpr_forward(users, pos_items, neg_items)
+            pos_scores = torch.sum(users_r * pos_items_r, dim=1)
+            neg_scores = torch.sum(users_r * neg_items_r, dim=1)
+
+            bpr_loss = F.softplus(neg_scores - pos_scores).mean()
+            reg_loss = self.l2_reg * l2_norm_sq.mean() + self.contrastive_reg * contrastive_loss.mean()
+            loss = bpr_loss + reg_loss
+            self.opt.zero_grad()
+            loss.backward()
+            self.opt.step()
+            losses.update(loss.item(), inputs.shape[0])
+        return losses.avg
+
+
 class IGCNTrainer(BasicTrainer):
     def __init__(self, trainer_config):
         super(IGCNTrainer, self).__init__(trainer_config)

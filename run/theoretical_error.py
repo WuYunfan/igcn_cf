@@ -10,8 +10,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 
 
 def plot_error(part_adj, u, ranked_users, ax, device, entity):
-    greedy_ranked_users, sort_ranked_users, degree_ranked_users, pr_ranked_users = ranked_users
-    greedy_ranked_users = greedy_ranked_users[::-1].copy()
+    sort_ranked_users, degree_ranked_users, pr_ranked_users = ranked_users
     sort_ranked_users = sort_ranked_users[::-1].copy()
     degree_ranked_users = degree_ranked_users[::-1].copy()
     pr_ranked_users = pr_ranked_users[::-1].copy()
@@ -19,14 +18,11 @@ def plot_error(part_adj, u, ranked_users, ax, device, entity):
 
     num_users = list(np.arange(0, n_users, 2000, dtype=np.int64)) + [n_users]
     num_users = np.array(num_users)
-    errors_greedy, errors_sort, errors_degree, errors_pr = [0.],  [0.],  [0.],  [0.]
-    Lu_greedy = sp.dok_matrix((n_users, n_users), dtype=np.float32)
+    errors_sort, errors_degree, errors_pr = [0.],  [0.],  [0.]
     Lu_sort = sp.dok_matrix((n_users, n_users), dtype=np.float32)
     Lu_dgree = sp.dok_matrix((n_users, n_users), dtype=np.float32)
     Lu_pr = sp.dok_matrix((n_users, n_users), dtype=np.float32)
     for nu in range(n_users):
-        ui = greedy_ranked_users[nu]
-        Lu_greedy[ui, ui] = 1.
         ui = sort_ranked_users[nu]
         Lu_sort[ui, ui] = 1.
         ui = degree_ranked_users[nu]
@@ -35,10 +31,6 @@ def plot_error(part_adj, u, ranked_users, ax, device, entity):
         Lu_pr[ui, ui] = 1.
         if nu + 1 in num_users:
             l_tensor = torch.tensor(u, dtype=torch.float32, device=device)
-            r_tensor = torch.tensor(sp.csr_matrix.dot(u.T, Lu_greedy.dot(part_adj)),
-                                    dtype=torch.float32, device=device)
-            errors_greedy.append(torch.norm(torch.mm(l_tensor, r_tensor), p=2).item() ** 2)
-
             r_tensor = torch.tensor(sp.csr_matrix.dot(u.T, Lu_sort.dot(part_adj)),
                                     dtype=torch.float32, device=device)
             errors_sort.append(torch.norm(torch.mm(l_tensor, r_tensor), p=2).item() ** 2)
@@ -50,17 +42,14 @@ def plot_error(part_adj, u, ranked_users, ax, device, entity):
             r_tensor = torch.tensor(sp.csr_matrix.dot(u.T, Lu_pr.dot(part_adj)),
                                     dtype=torch.float32, device=device)
             errors_pr.append(torch.norm(torch.mm(l_tensor, r_tensor), p=2).item() ** 2)
-            print((nu + 1) * 1. / n_users, errors_greedy[-1], errors_sort[-1],
-                  errors_degree[-1], errors_pr[-1])
-    maxi = errors_greedy[-1]
-    errors_greedy = np.array(errors_greedy) / maxi
+            print((nu + 1) * 1. / n_users, errors_sort[-1], errors_degree[-1], errors_pr[-1])
+    maxi = errors_sort[-1]
     errors_sort = np.array(errors_sort) / maxi
     errors_degree = np.array(errors_degree) / maxi
     errors_pr = np.array(errors_pr) / maxi
-    ax.plot(num_users / n_users, errors_greedy, label='greedy', marker='s')
-    ax.plot(num_users / n_users, errors_sort, label='sort', marker='v')
-    ax.plot(num_users / n_users, errors_degree, label='degree', marker='o')
-    ax.plot(num_users / n_users, errors_pr, label='page rank', marker='d')
+    ax.plot(num_users / n_users, errors_sort, label='error-sort', marker='v', c='green')
+    ax.plot(num_users / n_users, errors_degree, label='degree', marker='o', c='orange')
+    ax.plot(num_users / n_users, errors_pr, label='page rank', marker='d', c='red')
     ax.set_xlabel('Ratio of non-representative ' + entity, fontsize=17)
     if entity == 'users':
         ax.set_ylabel('Ratio of squared L2 norm\n of the error term', fontsize=17)
@@ -84,12 +73,11 @@ def main():
     with torch.no_grad():
         u, s, v = torch.svd_lowrank(part_adj_tensor, 64)
 
-    greedy_ranked_users, greedy_ranked_items = graph_rank_nodes(dataset, 'greedy')
     sort_ranked_users, sort_ranked_items = graph_rank_nodes(dataset, 'sort')
     degree_ranked_users, degree_ranked_items = graph_rank_nodes(dataset, 'degree')
     pr_ranked_users, pr_ranked_items = graph_rank_nodes(dataset, 'page_rank')
-    ranked_users = (greedy_ranked_users, sort_ranked_users, degree_ranked_users, pr_ranked_users)
-    ranked_items = (greedy_ranked_items, sort_ranked_items, degree_ranked_items, pr_ranked_items)
+    ranked_users = (sort_ranked_users, degree_ranked_users, pr_ranked_users)
+    ranked_items = (sort_ranked_items, degree_ranked_items, pr_ranked_items)
     pdf = PdfPages('figure_5.pdf')
     fig, ax = plt.subplots(nrows=1, ncols=2, constrained_layout=True, figsize=(11, 4))
     axes = ax.flatten()

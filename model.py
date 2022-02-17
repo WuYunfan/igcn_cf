@@ -172,9 +172,13 @@ class IDCF_LGCN(BasicModel):
         return feat_mat
 
     def get_rep(self, contrastive=False):
+        padding_tensor = torch.empty([self.feat_mat.shape[0] - self.feat_mat.shape[1], self.embedding_size],
+                                     dtype=torch.float32, device=self.device)
+        padding_features = torch.cat([self.embedding.weight, padding_tensor], dim=0)
+
         row, column = self.feat_mat.indices()
         g = dgl.graph((column, row), num_nodes=self.feat_mat.shape[0], device=self.device)
-        x_q = dgl.ops.gspmm(g, 'mul', 'sum', lhs_data=self.embedding.weight, rhs_data=self.feat_mat.values())
+        x_q = dgl.ops.gspmm(g, 'mul', 'sum', lhs_data=padding_features, rhs_data=self.feat_mat.values())
         gat_outputs = []
         for i in range(self.n_headers):
             sampled_users = np.random.randint(0, self.n_old_users, size=self.n_samples)

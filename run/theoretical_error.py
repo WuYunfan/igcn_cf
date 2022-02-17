@@ -47,13 +47,13 @@ def plot_error(part_adj, u, ranked_users, ax, device, entity):
     errors_sort = np.array(errors_sort) / maxi
     errors_degree = np.array(errors_degree) / maxi
     errors_pr = np.array(errors_pr) / maxi
-    ax.plot(num_users / n_users, errors_sort, label='error-sort', marker='v', c='green')
-    ax.plot(num_users / n_users, errors_degree, label='degree', marker='o', c='orange')
-    ax.plot(num_users / n_users, errors_pr, label='page rank', marker='d', c='red')
-    ax.set_xlabel('Ratio of non-representative ' + entity, fontsize=17)
+    ax.plot(num_users / n_users, errors_sort, label='error-sort', marker='v', color='red')
+    ax.plot(num_users / n_users, errors_degree, label='degree', marker='o', color='blue')
+    ax.plot(num_users / n_users, errors_pr, label='page rank', marker='d', color='orange')
+    ax.set_xlabel('Ratio of non-template ' + entity, fontsize=17)
     if entity == 'users':
-        ax.set_ylabel('Ratio of squared L2 norm\n of the error term', fontsize=17)
-    ax.set_title('Different strategies to determine \n the representative ' + entity, fontsize=17)
+        ax.set_ylabel('Ratio of squared Frobenius \n norm of the error term', fontsize=17)
+    ax.set_title('Different strategies to determine \n the template ' + entity, fontsize=17)
     ax.legend(fontsize=14, loc=2)
 
 

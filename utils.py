@@ -48,6 +48,7 @@ def generate_daj_mat(dataset):
                             dtype=np.float32).tocsr()
     return adj_mat
 
+
 '''
 # This is for theoretical analysis.
 def greedy_or_sort(part_adj, u, ranking_metric, device):
@@ -101,7 +102,7 @@ def graph_rank_nodes(dataset, ranking_metric):
         part_adj = adj_mat[:dataset.n_users, dataset.n_users:]
         part_adj_tensor = get_sparse_tensor(part_adj, 'cpu')
         with torch.no_grad():
-            u, s, v = torch.svd_lowrank(part_adj_tensor, 4000)
+            u, s, v = torch.svd_lowrank(part_adj_tensor, 64)
             u, v = u.numpy(), v.numpy()
         user_metrics = greedy_or_sort(part_adj, u, ranking_metric, dataset.device)
         item_metrics = greedy_or_sort(part_adj.T, v, ranking_metric, dataset.device)

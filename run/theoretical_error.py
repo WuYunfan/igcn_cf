@@ -8,6 +8,9 @@ import scipy.sparse as sp
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 
+plt.rc('font', family='Times New Roman')
+plt.rcParams['pdf.fonttype'] = 42
+
 
 def plot_error(part_adj, u, ranked_users, ax, device, entity):
     sort_ranked_users, degree_ranked_users, pr_ranked_users = ranked_users
@@ -47,9 +50,9 @@ def plot_error(part_adj, u, ranked_users, ax, device, entity):
     errors_sort = np.array(errors_sort) / maxi
     errors_degree = np.array(errors_degree) / maxi
     errors_pr = np.array(errors_pr) / maxi
-    ax.plot(num_users / n_users, errors_sort, label='error-sort', marker='v', color='red')
     ax.plot(num_users / n_users, errors_degree, label='degree', marker='o', color='blue')
     ax.plot(num_users / n_users, errors_pr, label='page rank', marker='d', color='orange')
+    ax.plot(num_users / n_users, errors_sort, label='error-sort', marker='v', color='red')
     ax.set_xlabel('Ratio of non-template ' + entity, fontsize=17)
     if entity == 'users':
         ax.set_ylabel('Ratio of squared Frobenius \n norm of the error term', fontsize=17)
@@ -61,7 +64,7 @@ def main():
     log_path = __file__[:-3]
     init_run(log_path, 2021)
 
-    device = torch.device('cuda')
+    device = torch.device('cpu')
     config = get_gowalla_config(device)
     dataset_config, model_config, trainer_config = config[2]
     dataset_config['path'] = dataset_config['path'][:-4] + str(1)

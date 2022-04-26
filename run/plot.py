@@ -9,6 +9,9 @@ import scipy.sparse as sp
 from matplotlib.backends.backend_pdf import PdfPages
 import pandas as pd
 
+plt.rc('font', family='Times New Roman')
+plt.rcParams['pdf.fonttype'] = 42
+
 
 def main():
     """
@@ -94,6 +97,7 @@ def main():
     pdf.close()
     """
 
+
     mf = [11.934] * 10
     imf_d = [8.925, 10.876, 12.014, 12.762, 13.251, 13.648, 13.775, 13.926, 14.096, 14.095]
     imf_nd = [9.289, 11.197, 12.335, 13, 13.512, 13.795, 13.888, 13.964, 14.164, 14.095]
@@ -108,8 +112,8 @@ def main():
     axes = ax.flatten()
     axes[0].plot(ratio, np.array(mf) / 100., label='MF', marker='s', color='green')
     axes[0].plot(ratio, np.array(imf_d) / 100., label='INMO-MF-degree', marker='o', color='blue')
-    axes[0].plot(ratio, np.array(imf_nd) / 100., label='INMO-MF-error_sort', marker='v', color='red')
     axes[0].plot(ratio, np.array(imf_pr) / 100., label='INMO-MF-page_rank', marker='d', color='orange')
+    axes[0].plot(ratio, np.array(imf_nd) / 100., label='INMO-MF-error_sort', marker='v', color='red')
     axes[0].set_xticks(ratio)
     axes[0].legend(fontsize=13)
     axes[0].set_xlabel('Percentage of template users/items', fontsize=17)
@@ -117,8 +121,8 @@ def main():
     axes[0].set_title('INMO-MF', fontsize=17)
     axes[1].plot(ratio, np.array(lgcn) / 100., label='LightGCN', marker='s', color='green')
     axes[1].plot(ratio, np.array(igcn_d) / 100., label='INMO-LGCN-degree', marker='o', color='blue')
-    axes[1].plot(ratio, np.array(igcn_nd) / 100., label='INMO-LGCN-error_sort', marker='v', color='red')
     axes[1].plot(ratio, np.array(igcn_pr) / 100., label='INMO-LGCN-page_rank', marker='d', color='orange')
+    axes[1].plot(ratio, np.array(igcn_nd) / 100., label='INMO-LGCN-error_sort', marker='v', color='red')
     axes[1].set_xticks(ratio)
     axes[1].legend(fontsize=13)
     axes[1].set_xlabel('Percentage of template users/items', fontsize=17)
@@ -128,21 +132,27 @@ def main():
     plt.close(fig)
     pdf.close()
 
+
     """
-    imf = [13.848, 13.862, 13.906, 13.958, 13.751]
-    igcn = [15.315, 15.378, 15.391, 15.172, 14.639]
+    imf = np.array([14.13, 14.16, 14.20, 14.15, 13.82]) / 100.
+    dev_m = np.array([0.07, 0.07, 0.08, 0.10, 0.09]) / 100.
+    igcn = np.array([15.41, 15.44, 15.41, 15.36, 15.09]) / 100.
+    dev_g = np.array([0.10, 0.09, 0.10, 0.10, 0.08]) / 100.
     beta = ['0', '0.001', '0.01', '0.1', '1']
+    x_pos = np.arange(imf.shape[0])
     pdf = PdfPages('figure_3.pdf')
     fig, ax = plt.subplots(nrows=1, ncols=2, constrained_layout=True, figsize=(11, 4))
     axes = ax.flatten()
-    axes[0].plot(np.array(imf) / 100., marker='s')
-    axes[0].set_xticks([0, 1, 2, 3, 4])
+    axes[0].plot(x_pos, imf, marker='s')
+    axes[0].fill_between(x_pos, imf - dev_m, imf + dev_m, alpha=0.2)
+    axes[0].set_xticks(x_pos)
     axes[0].set_xticklabels(beta)
     axes[0].set_xlabel('Weight of self-enhanced loss', fontsize=17)
     axes[0].set_ylabel('NDCG@20', fontsize=17)
     axes[0].set_title('INMO-MF', fontsize=17)
-    axes[1].plot(np.array(igcn) / 100., marker='s')
-    axes[1].set_xticks([0, 1, 2, 3, 4])
+    axes[1].plot(x_pos, igcn, marker='s')
+    axes[1].fill_between(x_pos, igcn - dev_g, igcn + dev_g, alpha=0.2)
+    axes[1].set_xticks(x_pos)
     axes[1].set_xticklabels(beta)
     axes[1].set_xlabel('Weight of self-enhanced loss', fontsize=17)
     axes[1].set_ylabel('NDCG@20', fontsize=17)
@@ -150,7 +160,9 @@ def main():
     pdf.savefig()
     plt.close(fig)
     pdf.close()
+    """
 
+    """
     def read_csv_log(path):
         df = pd.read_csv(path)
         x = df['Step'].values
@@ -160,22 +172,40 @@ def main():
     pdf = PdfPages('figure_4.pdf')
     fig, ax = plt.subplots(nrows=1, ncols=2, constrained_layout=True, figsize=(11, 4))
     axes = ax.flatten()
-    x, y = read_csv_log('/Users/wuyunfan/work/papers/21-3-code/igcn/logs/final/imf/gowalla/1/csv.csv')
+    x, y = read_csv_log('/Users/wuyunfan/work/papers/21-3-code/igcn/logs/dropui/imf/gowalla/0/csv.csv')
     axes[0].plot(x, y, label='INMO-MF')
-    x, y = read_csv_log('/Users/wuyunfan/work/papers/21-3-code/igcn/logs/ablation/anneal/imf/csv.csv')
+    x, y = read_csv_log('/Users/wuyunfan/work/papers/21-3-code/igcn/logs/ablation/whdelta/imf/0/csv.csv')
     axes[0].plot(x, y, label='INMO-MF w/o NA')
     axes[0].set_xlabel('Epoch', fontsize=17)
     axes[0].set_ylabel('NDCG@20', fontsize=17)
     axes[0].set_title('INMO-MF', fontsize=17)
     axes[0].legend(fontsize=14, loc=4)
-    x, y = read_csv_log('/Users/wuyunfan/work/papers/21-3-code/igcn/logs/final/igcn/gowalla/1/csv.csv')
+    x, y = read_csv_log('/Users/wuyunfan/work/papers/21-3-code/igcn/logs/dropui/igcn/gowalla/0/csv.csv')
     axes[1].plot(x, y, label='INMO-LGCN')
-    x, y = read_csv_log('/Users/wuyunfan/work/papers/21-3-code/igcn/logs/ablation/anneal/igcn/csv.csv')
+    x, y = read_csv_log('/Users/wuyunfan/work/papers/21-3-code/igcn/logs/ablation/whdelta/igcn/0/csv.csv')
     axes[1].plot(x, y, label='INMO-LGCN w/o NA')
     axes[1].set_xlabel('Epoch', fontsize=17)
     axes[1].set_ylabel('NDCG@20', fontsize=17)
     axes[1].set_title('INMO-LGCN', fontsize=17)
     axes[1].legend(fontsize=14, loc=4)
+    pdf.savefig()
+    plt.close(fig)
+    pdf.close()
+    """
+
+    """
+    pdf = PdfPages('figure_6.pdf')
+    fig, ax = plt.subplots(constrained_layout=True, figsize=(11, 4))
+    models = ('LightGCN', 'MF', 'INMO-LGCN', 'INMO-MF')
+    times = np.array([8007.1, 4291.2,  3.4, 1.8])
+    y_pos = np.arange(len(models))
+    bar = ax.barh(y_pos, times)
+    ax.set_yticks(y_pos)
+    ax.set_yticklabels(models, fontsize=17)
+    ax.set_xlim(0, 9000)
+    ax.set_xlabel('Inference/Training Time (s)', fontsize=17)
+    ax.set_title('The inference time of INMO and the training time of MF and LightGCN', fontsize=17)
+    ax.bar_label(bar, fontsize='xx-large')
     pdf.savefig()
     plt.close(fig)
     pdf.close()
